@@ -63,9 +63,13 @@ class Database_Backup extends Command
                 $schema = new Schema($database, $connect->local_db);
                 $schema->get_tables_lists();
 
-                // For tables that exist on both the remote and local, check to see if the table structure has chnged
+                // For tables that exist on both the remote and local, check to see if the table structure has chnaged
                 if (count($schema->check_local) > 0) {
-                    $schema->check_tables();
+                    $reset_tables = $schema->check_tables();
+
+                    // If the structure has changed, we dont have much choice but to drop, re-create and resync the tables
+                    $schema->remove_local = array_merge($schema->remove_local, $reset_tables);
+                    $schema->create_local = array_merge($schema->create_local, $reset_tables);
                 }
 
                 // Remove any tables that have been dropped from the remote
@@ -76,6 +80,12 @@ class Database_Backup extends Command
                 // Create any new tables locally
                 if (count($schema->create_local) > 0) {
                     $schema->create_local();
+                }
+
+                // GO!
+                foreach ($schema->tables_list as $table) {
+                    $backup = new Backup($database, $connect->local_db, $table);
+                    $backup->action();
                 }
             }
 

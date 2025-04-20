@@ -6,10 +6,13 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DBSchema;
 
+use function Laravel\Prompts\error;
 use function Laravel\Prompts\note;
+use function Laravel\Prompts\info;
 use function Laravel\Prompts\progress;
 
 use App\Models\Table;
+use App\Models\State;
 
 class Schema
 {
@@ -22,11 +25,19 @@ class Schema
     public array $remove_local = [];
     public array $check_local = [];
 
+    public array $tables_list = [];
+
+    public int $host_id;
+    public int $database_id;
+
     public function __construct($database, $local)
     {
         $this->local_db = $local;
         $this->remote_db = 'host_'.$database->host_id;
         $this->config_tables = $database->tables->toArray();
+
+        $this->host_id = $database->host_id;
+        $this->database_id = $database->id;
     }
 
     public function get_tables_lists(): void
@@ -48,6 +59,9 @@ class Schema
         $this->create_local = array_diff($remote, $local);
         $this->remove_local = array_diff($local, $remote);
         $this->check_local = array_intersect($local, $remote);
+
+        // Keep a canonical list of tables
+        $this->tables_list = $remote;
 
         $progress->finish(); echo "\n";
     }
@@ -72,29 +86,62 @@ class Schema
         $progress = progress(label: 'Comparing table structures', steps: count($this->check_local));
         $progress->start();
 
+        $reset_tables = [];
+
         foreach ($this->check_local as $table) {
 
             // Get table structures
             $remote = DB::connection($this->remote_db)->selectOne('SHOW CREATE TABLE '.$table)->{'Create Table'};
             $local = DB::connection($this->local_db)->selectOne('SHOW CREATE TABLE '.$table)->{'Create Table'};
-
-            // $alter = Alter::compare_table_structures($remote->{'Create Table'}, $local->{'Create Table'}, $table);
             
+            // Drop variable elements from the statement
+            $remote = $this->cleanup_create($remote);
+            $local = $this->cleanup_create($local);
+
             if ($remote != $local) {
-                // dump(Alter::parse_create_table($remote));
-                // dump(Alter::parse_create_table($local));
-                dump($remote);
-                dump('--------------------------------------');
+                $reset_tables[] = $table;
             }
 
             $progress->advance();
         }
 
         $progress->finish(); echo "\n";
+
+        if (count($reset_tables) > 0) {
+            error('Table structure has changed (resync required):');
+            foreach ($reset_tables as $reset) {
+                error(' - '.$reset);
+            }
+
+            echo "\n";
+        }
+        
+        return $reset_tables;
+    }
+
+    protected function cleanup_create($statement)
+    {
+        // Trim everything after the last )
+        $statement = substr($statement, 0, strrpos($statement, ')') + 1);
+
+        $statement = str_replace('CHARACTER SET ', '', $statement);
+        $statement = str_replace('COLLATE ', '', $statement);
+        $statement = str_replace('utf8mb4 ', '', $statement);
+        $statement = str_replace('utf8mb4_unicode_ci ', '', $statement);
+
+        return $statement;
     }
 
     public function create_local()
     {
+        info('Creating tables:');
+        
+        foreach ($this->create_local as $reset) {
+            info(' - '.$reset);
+        }
+        
+        echo "\n";
+
         $progress = progress(label: 'Creating new tables', steps: count($this->create_local));
         $progress->start();
 
@@ -113,12 +160,23 @@ class Schema
 
     public function remove_local()
     {
+        error('Dropping tables:');
+
+        foreach ($this->remove_local as $reset) {
+            error(' - '.$reset);
+        }
+        
+        echo "\n";
+
         $progress = progress(label: 'Dropping removed tables', steps: count($this->remove_local));
         $progress->start();
 
         foreach ($this->remove_local as $table) {
             // Drop
-            DBSchema::dropIfExists($table);
+            DBSchema::connection($this->local_db)->dropIfExists($table);
+
+            // Remove state
+            State::where('host_id', $this->host_id)->where('database_id', $this->database_id)->where('table_name', $table)->delete();
 
             $progress->advance();
         }

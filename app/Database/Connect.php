@@ -10,6 +10,10 @@ use Symfony\Component\Process\Process;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\alert;
 use function Laravel\Prompts\progress;
+use function Laravel\Prompts\spin;
+use function Laravel\Prompts\pause;
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
 
 use App\Models\Config;
 use App\Models\Host;
@@ -96,8 +100,8 @@ class Connect
         // DB Connect
         $connect = [
             'driver' => 'mysql',
-            'host' => '127.0.0.1',
-            'port' => $this->local_port,
+            'host' => $host->use_ssh_tunnel ? '127.0.0.1' : $host->db_host,
+            'port' => $host->use_ssh_tunnel ? $this->local_port : $host->db_port,
             'database' => $database->database_name,
             'username' => $host->db_username,
             'password' => $host->db_password,
@@ -206,5 +210,45 @@ class Connect
 
             exit(1);
         }
+    }
+
+    public function test($host): void
+    {
+        if ($host->use_ssh_tunnel) {
+            spin(message: 'Opening SSH tunnel', callback: fn () => $this->connect_tunnel($host));
+        }
+
+        $connect = [
+            'driver' => 'mysql',
+            'host' => $host->use_ssh_tunnel ? '127.0.0.1' : $host->db_host,
+            'port' => $host->use_ssh_tunnel ? $this->local_port : $host->db_port,
+            'database' => null,
+            'username' => $host->db_username,
+            'password' => $host->db_password,
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'strict' => true,
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'engine' => null,
+            'options' => [],
+        ];
+
+        AppConfig::set('database.connections.test', $connect);
+
+        try {
+            DB::connection('test')->getPDO();
+            info('Connection successful!');
+        } catch (\Exception $e) {
+            error('Connection FAILED');
+        }
+
+        if ($host->use_ssh_tunnel) {
+            spin(message: 'Closing SSH tunnel', callback: fn () => $this->disconnect_tunnel());
+        }
+
+        pause();
+
+        return;
     }
 }

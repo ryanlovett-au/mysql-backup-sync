@@ -83,19 +83,27 @@ class Backup
         $primary_key = $this->get_primary_key();
 
         // Determine which query type to use
-        if (!empty($this->state->last_updated_at)) {
+        if ($timestamps) {
+            if (empty($this->state->last_updated_at)) {
+                $this->state->last_updated_at = '0000-00-00 00:00:00';
+            }
+
             $query = DB::connection($this->remote_db)
                 ->table($this->table->table_name)
-                ->where('updated_at', '>', $this->state->last_updated_at)
+                ->where('updated_at', '>=', $this->state->last_updated_at)
                 ->orderBy('updated_at', 'asc');
 
             $count = DB::connection($this->remote_db)
                 ->table($this->table->table_name)
-                ->where('updated_at', '>', $this->state->last_updated_at)
+                ->where('updated_at', '>=', $this->state->last_updated_at)
                 ->count();
         }
 
-        else if (!empty($this->state->last_id)) {
+        else {
+            if (empty($this->state->last_id)) {
+                $this->state->last_id = 0;
+            }
+
             $query = DB::connection($this->remote_db)
                 ->table($this->table->table_name)
                 ->where($primary_key, '>', $this->state->last_id)
@@ -105,10 +113,6 @@ class Backup
                 ->table($this->table->table_name)
                 ->where($primary_key, '>', $this->state->last_id)
                 ->count();
-        }
-
-        else {
-            return;
         }
 
         // Are we going??
@@ -142,17 +146,6 @@ class Backup
             });
 
             $progress->finish(); echo "\n";
-
-            // Failsafe update state table
-            if ($timestamps) {
-                $this->state->last_updated_at = DB::connection($this->local_db)->table($this->table->table_name)->orderBy('updated_at', 'desc')->value('updated_at');
-            }
-
-            if ($primary_key) {
-                $this->state->last_id = DB::connection($this->local_db)->table($this->table->table_name)->orderBy($primary_key, 'desc')->value($primary_key);
-            }
-
-            $this->state->save();
         }
     }
 
@@ -161,64 +154,8 @@ class Backup
         // Truncate
         DB::connection($this->local_db)->table($this->table->table_name)->delete();
 
-        // Check remote rows
-        $count = DB::connection($this->remote_db)->table($this->table->table_name)->count();
-
-        // Determine how to update state
-        $timestamps = $this->has_timestamps();
-        $primary_key = $this->get_primary_key();
-
-        if ($count > 0) {
-            $progress = progress(label: 'Re-Syncing '.$this->table->table_name, steps: $count);
-            $progress->start();
-
-            // Get remote rows
-            $query = DB::connection($this->remote_db)->table($this->table->table_name);
-
-            // Try and get them in some semblance of an order
-            if ($primary_key = $this->get_primary_key()) {
-                $query->orderBy($primary_key, 'asc');
-            }
-            
-            // Get the data
-            $query->chunk(500, function ($rows) use ($progress, $primary_key) {
-            
-                // Cast rows to arrays
-                $rows = array_map(function ($row) {
-                    return (array) $row;
-                }, $rows->toArray());
-
-                // Insert
-                DB::connection($this->local_db)
-                    ->table($this->table->table_name)
-                    ->upsert($rows, [],
-                        DBSchema::connection($this->local_db)
-                            ->getColumnListing($this->table->table_name)
-                    );
-
-                // Update state as we go - only use primary key as that is how we are getting source rows
-                if ($primary_key) { 
-                    $this->state->last_id = end($rows)[$primary_key];
-                    $this->state->last_updated_at = null;
-                    $this->state->save();
-                }
-
-                $progress->advance(count($rows));
-            });
-
-            $progress->finish(); echo "\n";
-
-            // Failsafe update state table
-            if ($timestamps) {
-                $this->state->last_updated_at = DB::connection($this->local_db)->table($this->table->table_name)->orderBy('updated_at', 'desc')->value('updated_at');
-            }
-
-            if ($primary_key) {
-                $this->state->last_id = DB::connection($this->local_db)->table($this->table->table_name)->orderBy($primary_key, 'desc')->value($primary_key);
-            }
-
-            $this->state->save();
-        }
+        // Sync
+        $this->update();
     }
 
     protected function get_primary_key(): string|null

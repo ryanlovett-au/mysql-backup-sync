@@ -184,7 +184,7 @@ PR's are always welcome.
 
 ## Warranties
 
-I do use this application in production to backup and sync my production databases, however, your millage may vary. I do not warrant that is doe anything, at all.
+I do use this application in production to backup and sync my production databases, however, your millage may vary. I do not warrant that is does anything, at all.
 
 ## License
 

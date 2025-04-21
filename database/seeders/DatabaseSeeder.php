@@ -18,6 +18,7 @@ class DatabaseSeeder extends Seeder
             ['key' => 'backup_db_port', 'value' => null],
             ['key' => 'backup_db_username', 'value' => null],
             ['key' => 'backup_db_password', 'value' => null],
+            ['key' => 'skip_tz_check', 'value' => 0],
         ]);
     }
 }

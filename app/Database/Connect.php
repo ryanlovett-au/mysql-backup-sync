@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
 
 use function Laravel\Prompts\note;
+use function Laravel\Prompts\alert;
 use function Laravel\Prompts\progress;
 
 use App\Models\Config;
@@ -19,28 +20,6 @@ class Connect
     public $remote_db = null;
     public $local_db = null;
     public $local_port = '6448';
-
-    // public function process($specific = null): void
-    // {
-    //     if ($specific) {
-    //         $hosts = Host::where('db_host', $specific)->with('databases.tables')->get();
-    //     } else {
-    //         $hosts = Host::select()->with('databases.tables')->get();
-    //     }
-
-    //     foreach ($hosts as $host) {
-    //         $this->connect_tunnel($host);
-
-    //         foreach ($host->databases as $database) {
-    //             $this->setup_remote_db($host, $database);
-    //             $this->setup_local_db($host, $database);
-
-    //             (new Schema($database, $this->local_db))->process();
-    //         }
-
-    //         $this->disconnect_tunnel();
-    //     }
-    // }
 
     public function connect_tunnel($host): void
     {
@@ -194,11 +173,38 @@ class Connect
                     // Disconnect to force reconnection next time
                     DB::disconnect($this->local_db);
                 } else {
-                    throw new Exception('Local database does not exist and not able to be created.');
+                    alert('Error: Local database does not exist and not able to be created.');
+
+                    $this->disconnect_tunnel();
+                    
+                    exit(1);
                 }
             }
         }
 
         $progress->finish(); echo "\n";
+    }
+
+    public function check_tz()
+    {
+        $remote = DB::connection($this->remote_db)->selectOne('SELECT @@global.time_zone')->{'@@global.time_zone'};
+
+        if ($remote == 'SYSTEM') {
+            $remote = DB::connection($this->remote_db)->selectOne('SELECT @@system_time_zone')->{'@@system_time_zone'};
+        }
+
+        $local = DB::connection($this->local_db)->selectOne('SELECT @@global.time_zone')->{'@@global.time_zone'};
+
+        if ($local == 'SYSTEM') {
+            $local = DB::connection($this->local_db)->selectOne('SELECT @@system_time_zone')->{'@@system_time_zone'};
+        }
+
+        if ($remote != $local) {
+            alert('Error: Local database timezone ('.$local.') does not match remote database timezone ('.$remote.'). This will likely cause issues with datetime object synchronisation during DST transitions. Please correct this issue.');
+
+            $this->disconnect_tunnel();
+
+            exit(1);
+        }
     }
 }

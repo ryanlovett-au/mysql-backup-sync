@@ -19,9 +19,9 @@ return new class extends Migration
             $table->string('db_password');
             $table->boolean('db_use_ssl')->default(0);
             $table->boolean('use_ssh_tunnel')->default(0);
-            $table->string('ssh_host');
-            $table->string('ssh_port')->default(22);
-            $table->string('ssh_username');
+            $table->string('ssh_host')->nullable();
+            $table->string('ssh_port')->default(22)->nullable();
+            $table->string('ssh_username')->nullable();
             $table->string('ssh_password')->nullable();
             $table->string('ssh_public_key_path')->nullable();
             $table->string('ssh_private_key_path')->nullable();

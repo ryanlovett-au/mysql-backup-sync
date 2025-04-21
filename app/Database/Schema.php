@@ -61,6 +61,7 @@ class Schema
         $this->check_local = array_intersect($local, $remote);
 
         // Keep a canonical list of tables
+        sort($remote);
         $this->tables_list = $remote;
 
         $progress->finish(); echo "\n";
@@ -70,15 +71,19 @@ class Schema
     {
         // Get the full list of tables from the connection
         $tables = DBSchema::connection($connection)->getTables(schema: config('database.connections.'.$connection.'.database'));
-        $tables = collect($tables)->pluck('name')->toArray();
+        return collect($tables)->pluck('name')->toArray();
+    }
 
-        // If we are looking for all tables then just return the list
-        if (count($this->config_tables) === 1 && $this->config_tables[0]['table_name'] == '[all]') {
-            return $tables;
+    public function create_tables_in_tables_db(array $tables): void
+    {
+        foreach ($tables as $table) {
+            if (!Table::where('database_id', $this->database_id)->where('table_name', $table)->first()) {
+                $create = new Table();
+                $create->database_id = $this->database_id;
+                $create->table_name = $table;
+                $create->save();
+            }
         }
-
-        // If we are looking for a specific list of tables, filter the list
-        return array_intersect($tables, $this->config_tables->pluck('table_name')->toArray());
     }
 
     public function check_tables()
@@ -152,6 +157,12 @@ class Schema
             // Create locally
             DB::connection($this->local_db)->statement($create->{'Create Table'});
 
+            // Add to tables table
+            $create = new Table();
+            $create->database_id = $this->database_id;
+            $create->table_name = $table;
+            $create->save();
+
             $progress->advance();
         }
 
@@ -177,6 +188,9 @@ class Schema
 
             // Remove state
             State::where('host_id', $this->host_id)->where('database_id', $this->database_id)->where('table_name', $table)->delete();
+
+            // Remove from tables table
+            Table::where('database_id', $this->database_id)->where('table_name', $table)->delete();
 
             $progress->advance();
         }

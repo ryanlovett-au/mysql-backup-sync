@@ -15,8 +15,9 @@ return new class extends Migration
             $table->id();
             $table->foreignID('host_id');
             $table->string('database_name');
-            $table->string('webhook_success');
-            $table->string('webhook_failure');
+            $table->boolean('all_tables')->default(1);
+            $table->string('webhook_success')->nullable();
+            $table->string('webhook_failure')->nullable();
             $table->boolean('is_active')->default(1);
             $table->timestamps();
         });

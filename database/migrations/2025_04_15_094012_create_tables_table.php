@@ -15,6 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignID('database_id');
             $table->string('table_name');
+            $table->boolean('always_resync')->default(0);
             $table->boolean('is_active')->default(1);
             $table->timestamps();
         });

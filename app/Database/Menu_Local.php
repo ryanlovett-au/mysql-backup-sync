@@ -75,7 +75,7 @@ class Menu_Local
 
         $update = text(
             label: strtoupper(str_replace('_', ' ', $config->key)).' = ',
-            default: $config->value,
+            default: $config->value ?? '',
             hint: 'For NULL enter an empty string...'
         );
 

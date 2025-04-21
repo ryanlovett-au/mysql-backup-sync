@@ -80,7 +80,7 @@ class Menu_Remote
 
 	private static function remote_config_host_options($host): array
     {
-        $columns = DBSchema::getColumnListing('hosts');
+        $columns = array_diff(DBSchema::getColumnListing('hosts'), ['id', 'created_at', 'updated_at', 'db_use_ssl', 'ssh_private_key_passphrase']);
 
         $len = collect($columns)->map(fn ($column) => is_string($column) ? strlen($column) : 0 )->max();
 
@@ -89,10 +89,6 @@ class Menu_Remote
         $options['-'] = '-------------------- Config ----------------------';
 
         foreach ($columns as $column) {
-            if (in_array($column, ['id', 'created_at', 'updated_at'])) {
-                continue;
-            }
-
             $options[$column] = str_pad(strtoupper(str_replace('_', ' ', $column)), $len).' = '.$host->{$column};
         }
 
@@ -201,7 +197,7 @@ class Menu_Remote
 
     private static function remote_config_database_options($database): array
     {
-        $columns = DBSchema::getColumnListing('databases');
+        $columns = array_diff(DBSchema::getColumnListing('databases'), ['id', 'host_id', 'all_tables', 'created_at', 'updated_at']);
 
         $len = collect($columns)->map(fn ($column) => is_string($column) ? strlen($column) : 0 )->max();
 
@@ -210,10 +206,6 @@ class Menu_Remote
         $options['-'] = '-------------------- Config ----------------------';
 
         foreach ($columns as $column) {
-            if (in_array($column, ['id', 'host_id', 'all_tables', 'created_at', 'updated_at'])) {
-                continue;
-            }
-
             $options[$column] = str_pad(strtoupper(str_replace('_', ' ', $column)), $len).' = '.$database->{$column};
         }
 

@@ -2,7 +2,7 @@
 
 This application was written to provide a way to effect incremental backups of remote MySQL databases over sometimes unreliable internet connections. It was also written to provide a away to synchronise/move large databases, in active use, that may take several days to finish.
 
-It is primarily designed to be used with databases that track row level changes through the use of an 'updated_at' column, such as those used by the Laravel framework. However, other row level change tracking is also supported, such as write-once tables that only ever add new rows (and never edit rows). For tables that do not implement either of these approaches, full table sync on each run is also supported.
+It is primarily designed to be used with databases that track row level changes through the use of an `updated_at` column, such as those used by the Laravel framework. However, other row level change tracking is also supported, such as write-once tables that only ever add new rows (and never edit rows). For tables that do not implement either of these approaches, full table sync on each run is also supported.
 
 ## Requirements
 
@@ -33,7 +33,7 @@ Simply run `php artisan db:menu`.
 
 The first step is to configure a local database, this can be any MySQL database, however it should be directly accessible from the host running this application, preferably on the same machine or a low latency link.
 
-`
+```
  ┌ Configure Local (Backup) Host/Database ──────────────────────┐
  │   ○ -------------------- Config ----------------------       │
  │   ○ BACKUP DB HOST     = 127.0.0.1                           │
@@ -44,7 +44,7 @@ The first step is to configure a local database, this can be any MySQL database,
  │   ○ --------------------------------------------------       │
  │ › ● Back                                                     │
  └──────────────────────────────────────────────────────────────┘
-`
+```
 
 **Note:** The MySQL server you are using for backups really *must* have a matching timezone to the remote source servers. You can override this check here, however it is likely you will get timestamp/datetime errors during sync. You have been warned!
 
@@ -52,7 +52,7 @@ The first step is to configure a local database, this can be any MySQL database,
 
 You can then proceed to configure any number of remote hosts.
 
-`
+```
  ┌ Configure Remote (Original) Host/Database -  ────────────────┐
  │ › ● -------------------- Config ----------------------       │
  │   ○ DB HOST                    =                             │
@@ -71,7 +71,7 @@ You can then proceed to configure any number of remote hosts.
  │   ○ Delete Host                                              │
  │   ○ Back                                                     │
  └──────────────────────────────────────────────────────────────┘
-`
+```
 
 Remote hosts can be directly connected servers, or this application can tunnel MySQL connections over an SSH tunnel. 
 
@@ -83,14 +83,14 @@ You can then test your connection using the menu option provided.
 
 Once you have configured a remote host you can then proceed to add a database.
 
-`
+```
  │   ○ ------------------- Databases --------------------    │
  │   ○ Add Remote Database                                   │
  │   ○ dispatch_dev                                          │
  │   ○ --------------------------------------------------    │
- `
+ ```
 
-` 
+```
  ┌ Configure Database for 127.0.0.1 ───────────────────────────────┐
  │ › ● -------------------- Config ----------------------          │
  │   ○ DATABASE NAME   =                                           │
@@ -101,11 +101,11 @@ Once you have configured a remote host you can then proceed to add a database.
  │   ○ Delete Database                                             │
  │   ○ Back                                                        │
  └─────────────────────────────────────────────────────────────────┘
- `
+ ```
 
 Once you have provided a database name, this application will then attempt to connect to that remote database and populate a list of tables.
 
-`
+```
  ┌ Configure Database for 127.0.0.1 ───────────────────────────────┐
  │ › ● -------------------- Config ----------------------     ┃    │
  │   ○ DATABASE NAME   = dispatch_dev                         │    │
@@ -123,7 +123,7 @@ Once you have provided a database name, this application will then attempt to co
  │   ○ devices                                                │    │
  │   ○ dispatch_numbers                                       │    │
  └─────────────────────────────────────────────────────────────────┘
- `
+```
 
 You can then choose, for each table, if you would like the application to skip that table during backup/sync, or what behaviour you would like the application to use when backing up/syncing.
 
@@ -131,13 +131,13 @@ You can then choose, for each table, if you would like the application to skip t
 
 You can then run a backup/sync from the main menu
 
-`
+```
  ┌ Main Menu ───────────────────────────────────────────────────┐
  │ › ● Run Backup/Sync                                          │
  │   ○ Configuration                                            │
  │   ○ Exit                                                     │
  └──────────────────────────────────────────────────────────────┘
- `
+ ```
 
 Or by running `php artisan db:backup`.
 

@@ -157,11 +157,13 @@ class Schema
             // Create locally
             DB::connection($this->local_db)->statement($create->{'Create Table'});
 
-            // Add to tables table
-            $create = new Table();
-            $create->database_id = $this->database_id;
-            $create->table_name = $table;
-            $create->save();
+            // Add to tables table, if not already present
+            if (!Table::where('database_id', $this->database_id)->where('table_name', $table)->first()) {
+                $create = new Table();
+                $create->database_id = $this->database_id;
+                $create->table_name = $table;
+                $create->save();
+            }
 
             $progress->advance();
         }

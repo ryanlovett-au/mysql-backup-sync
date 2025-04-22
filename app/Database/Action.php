@@ -8,6 +8,8 @@ use function Laravel\Prompts\clear;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\spin;
+use function Laravel\Prompts\pause;
+use function Laravel\Prompts\alert;
 
 use App\Database\Connect;
 use App\Database\Schema;
@@ -88,7 +90,15 @@ class Action
                     try {
 	                    $backup->action();
 	                } catch (\Exception $e) {
+                        if ($e->errorInfo[1] == 2006) {
+                            alert('Error: Remote server reported out of memory error.');
+                            alert('This is most commonly due to sorts of non-indexed columns in tables with large row sizes.');
+                            alert('The last table attempted above is the table that generated the error.');
+                            alert('Check that your updated_at column is indexed for this table, or set this table to always resync.');
+                        }
+
 	                	self::notify($database, false);
+                        pause();
 	                	break;
 	                }
                 }

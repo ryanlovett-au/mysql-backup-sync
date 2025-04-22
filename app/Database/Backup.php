@@ -105,7 +105,7 @@ class Backup
 
         else if ($timestamps) {
             if (empty($this->state->last_updated_at)) {
-                $this->state->last_updated_at = '0000-00-00 00:00:00';
+                $this->state->last_updated_at = '1900-01-01 00:00:01';
             }
 
             $query = DB::connection($this->remote_db)

@@ -83,7 +83,17 @@ class Backup
         $primary_key = $this->get_primary_key();
 
         // Determine which query type to use
-        if ($timestamps) {
+        if ($this->table->always_resync) {
+            $query = DB::connection($this->remote_db)
+                ->table($this->table->table_name)
+                ->orderBy($primary_key, 'asc');
+
+            $count = DB::connection($this->remote_db)
+                ->table($this->table->table_name)
+                ->count();
+        }
+
+        else if ($timestamps) {
             if (empty($this->state->last_updated_at)) {
                 $this->state->last_updated_at = '0000-00-00 00:00:00';
             }

@@ -83,9 +83,29 @@ class Backup
         $primary_key = $this->get_primary_key();
 
         // Determine which query type to use
-        if ($timestamps) {
+        if ($this->table->always_resync || $primary_key == null) {
+            $query = DB::connection($this->remote_db)
+                ->table($this->table->table_name);
+
+            // Order by the primary key or by the first column if no primary key
+            if (!empty($primary_key)) {
+                $query->orderBy($primary_key);
+            } else {
+                $query->orderBy(
+                    DBSchema::connection($this->remote_db)
+                        ->getColumnListing($this->table->table_name)[0],
+                    'asc'
+                );
+            }
+
+            $count = DB::connection($this->remote_db)
+                ->table($this->table->table_name)
+                ->count();
+        }
+
+        else if ($timestamps) {
             if (empty($this->state->last_updated_at)) {
-                $this->state->last_updated_at = '0000-00-00 00:00:00';
+                $this->state->last_updated_at = '1900-01-01 00:00:01';
             }
 
             $query = DB::connection($this->remote_db)
@@ -139,7 +159,7 @@ class Backup
                 // Update state as we go - only use primary key as that is how we are getting source rows
                 $last = end($rows);
                 $this->state->last_updated_at = $timestamps ? $last['updated_at'] : null;
-                $this->state->last_id = $last[$primary_key];
+                $this->state->last_id = $last[$primary_key] ?? null;
                 $this->state->save();
 
                 $progress->advance(count($rows));

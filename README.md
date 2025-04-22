@@ -9,7 +9,7 @@ It is primarily designed to be used with databases that track row level changes 
 This is a TUI application written in the Laravel framework. It requires:	
 
  - Composer v2
- - PHP v8.2+
+ - PHP v8.2+ (with MySQL, SQLite, DOM/XML and CURL extensions - For Ubuntu 24.04 php8.3-xml php8.3-curl php-sqlite3 php-mysql)
  - A MySQL database in which to store backups
 
 ## Installation
@@ -20,6 +20,7 @@ To install:
  - Change to the cloned directory
  - `composer install`
  - `php artisan migrate --seed --force`
+ - You may also like to update the App Key in app.php (but not essential)
 
 ## Configuration
 
@@ -184,7 +185,7 @@ PR's are always welcome.
 
 ## Warranties
 
-I do use this application in production to backup and sync my production databases, however, your millage may vary. I do not warrant that is does anything, at all.
+I do use this application in production to backup and sync my production databases, however, your millage may vary. I do not warrant that it does anything, at all.
 
 ## License
 

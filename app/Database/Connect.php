@@ -97,6 +97,12 @@ class Connect
         $progress = progress(label: 'Configuring remote (original) database', steps: 1);
         $progress->start();
 
+        // Disconnect previous connections and reset config
+        if (!empty($this->remote_db)) {
+            DB::purge($this->remote_db);
+            $this->remote_db = null;
+        }
+
         // DB Connect
         $connect = [
             'driver' => 'mysql',
@@ -127,6 +133,12 @@ class Connect
     {
         $progress = progress(label: 'Configuring local (backup) database', steps: 1);
         $progress->start();
+
+        // Disconnect previous connections and reset config
+        if (!empty($this->local_db)) {
+            DB::purge($this->local_db);
+            $this->local_db = null;
+        }
 
         // Format local db names (max 64 utf8 characters)
         $len = 55 - iconv_strlen($database->database_name);

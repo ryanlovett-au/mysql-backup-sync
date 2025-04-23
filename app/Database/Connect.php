@@ -34,7 +34,7 @@ class Connect
         $command = ['ssh', '-N', '-L', $this->local_port.':'.$host->db_host.':'.$host->db_port, $host->ssh_username.'@'.$host->ssh_host, '-p', $host->ssh_port];
 
         // Authenticate
-        if (!empty($host->ssh_public_key_path) && !empty($host->ssh_private_key_path)) {
+        if (!empty($host->ssh_private_key_path)) {
             $command = array_merge($command, ['-i', $host->ssh_private_key_path]);
 
             // if (!empty($host->ssh_private_key_passphrase)) {

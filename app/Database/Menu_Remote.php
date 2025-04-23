@@ -80,7 +80,7 @@ class Menu_Remote
 
 	private static function remote_config_host_options($host): array
     {
-        $columns = array_diff(DBSchema::getColumnListing('hosts'), ['id', 'created_at', 'updated_at', 'db_use_ssl', 'ssh_private_key_passphrase']);
+        $columns = array_diff(DBSchema::getColumnListing('hosts'), ['id', 'created_at', 'updated_at', 'db_use_ssl', 'ssh_private_key_passphrase', 'ssh_public_key_path']);
 
         $len = collect($columns)->map(fn ($column) => is_string($column) ? strlen($column) : 0 )->max();
 

@@ -209,10 +209,18 @@ class Connect
             $remote = DB::connection($this->remote_db)->selectOne('SELECT @@system_time_zone')->{'@@system_time_zone'};
         }
 
+        if ($remote == '+00:00') {
+            $remote = 'UTC';
+        }
+
         $local = DB::connection($this->local_db)->selectOne('SELECT @@global.time_zone')->{'@@global.time_zone'};
 
         if ($local == 'SYSTEM') {
             $local = DB::connection($this->local_db)->selectOne('SELECT @@system_time_zone')->{'@@system_time_zone'};
+        }
+
+        if ($local == '+00:00') {
+            $local = 'UTC';
         }
 
         if ($remote != $local) {

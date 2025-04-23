@@ -93,7 +93,8 @@ class Action
                 }
 
                 // GO!
-                foreach ($schema->tables_list as $table) {
+                foreach ($schema->tables_list as $table) 
+                {
                     $backup = new Backup($database, $connect->local_db, $table);
 
                     try {

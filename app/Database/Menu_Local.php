@@ -2,13 +2,17 @@
 
 namespace App\Database;
 
+use Illuminate\Support\Str;
+
 use function Laravel\Prompts\clear;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\alert;
 use function Laravel\Prompts\progress;
 use function Laravel\Prompts\select;
+use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\text;
+use function Laravel\Prompts\textarea;
 
 use App\Models\Config;
 use App\Models\Host;
@@ -56,7 +60,7 @@ class Menu_Local
         $len = $config->pluck('key')->map(fn ($key) => is_string($key) ? strlen($key) : 0 )->max();
 
         foreach ($config as $conf) {
-            $options[$conf->key] = str_pad(strtoupper(str_replace('_', ' ', $conf->key)), $len).' = '.$conf->value;
+            $options[$conf->key] = str_pad(strtoupper(str_replace('_', ' ', $conf->key)), $len).' = '.Str::limit(str_replace(["\n", "\r\n", "\r"], ' ', $conf->value), 50);
         }
 
         $options['--'] = '--------------------------------------------------';
@@ -73,17 +77,47 @@ class Menu_Local
             return;
         }
 
-        $update = text(
-            label: strtoupper(str_replace('_', ' ', $config->key)).' = ',
-            default: $config->value ?? '',
-            hint: 'For NULL enter an empty string...'
-        );
+        if ($config->field_type == 'textarea') {
+            $update = textarea(
+                label: strtoupper(str_replace('_', ' ', $config->key)).' = ',
+                default: $config->value ?? '',
+                hint: 'A list of table names separated by newlines...'
+            );
 
-        if ($update == 'false' || $update == 'no') { $update = '0'; }
-        else if ($update == 'true' || $update == 'yes') { $update = '1'; }
+            $confirmed = confirm('All matching tables in the remote databases config will now be updated with this setting. Are you sure?');
 
-        $config->value = $update;
-        $config->save();
+            if ($confirmed) {
+                $config->value = $update;
+                $config->save();
+
+                // Get array of table names
+                $tables = explode(' ', str_replace(["\n", "\r\n", "\r"], ' ', $update));
+
+                foreach ($tables as $table) {
+                    if ($config->key == 'always_resync_tables') {
+                        Table::where('table_name', $table)->update(['always_resync' => 1]);
+                    }
+
+                    elseif ($config->key == 'always_inactive_tables') {
+                        Table::where('table_name', $table)->update(['is_active' => 0]);
+                    }
+                }
+            }
+        }
+
+        else {
+            $update = text(
+                label: strtoupper(str_replace('_', ' ', $config->key)).' = ',
+                default: $config->value ?? '',
+                hint: 'For NULL enter an empty string...'
+            );
+
+            if ($update == 'false' || $update == 'no') { $update = '0'; }
+            else if ($update == 'true' || $update == 'yes') { $update = '1'; }
+
+            $config->value = $update;
+            $config->save();
+        }
 
         return;
     }

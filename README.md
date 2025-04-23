@@ -19,8 +19,9 @@ To install:
  - Clone the repo
  - Change to the cloned directory
  - `composer install`
- - `php artisan migrate --seed --force`
- - You may also like to update the App Key in app.php (but not essential)
+ - That's it!
+
+ *You may also like to update the App Key in app.php (but not essential)*
 
 ## Configuration
 

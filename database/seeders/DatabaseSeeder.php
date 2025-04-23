@@ -6,6 +6,8 @@ use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 
+use App\Models\Config;
+
 class DatabaseSeeder extends Seeder
 {
     /**
@@ -13,12 +15,15 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        DB::table('config')->insert([
-            ['key' => 'backup_db_host', 'value' => null],
-            ['key' => 'backup_db_port', 'value' => null],
-            ['key' => 'backup_db_username', 'value' => null],
-            ['key' => 'backup_db_password', 'value' => null],
-            ['key' => 'skip_tz_check', 'value' => 0],
-        ]);
-    }
+        // Inital set
+        Config::firstOrCreate(['key' => 'backup_db_host'], ['key' => 'backup_db_host', 'field_type' => 'text', 'value' => null]);
+        Config::firstOrCreate(['key' => 'backup_db_port'], ['key' => 'backup_db_port', 'field_type' => 'text', 'value' => null]);
+        Config::firstOrCreate(['key' => 'backup_db_username'], ['key' => 'backup_db_username', 'field_type' => 'text', 'value' => null]);
+        Config::firstOrCreate(['key' => 'backup_db_password'], ['key' => 'backup_db_password', 'field_type' => 'text', 'value' => null]);
+        Config::firstOrCreate(['key' => 'skip_tz_check'], ['key' => 'skip_tz_check', 'field_type' => 'text', 'value' => null]);
+
+        // Added around v0.2.1
+        Config::firstOrCreate(['key' => 'always_resync_tables'], ['key' => 'always_resync_tables', 'field_type' => 'textarea', 'value' => null]);
+        Config::firstOrCreate(['key' => 'always_inactive_tables'], ['key' => 'always_inactive_tables', 'field_type' => 'textarea', 'value' => null]);
+    } 
 }

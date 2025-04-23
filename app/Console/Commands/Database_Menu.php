@@ -19,6 +19,11 @@ class Database_Menu extends Command
 
     public function handle(): void
     {
+        // Just check if we need to do any maintenance first?
+        $this->call('migrate', ['--quiet' => true, '--force' => true]);
+        $this->call('db:seed', ['--quiet' => true, '--force' => true]);
+
+        // Then go!
         Menu::home();
     }
 }

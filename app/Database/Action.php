@@ -23,11 +23,8 @@ class Action
 	{
 		clear();
 
-        if ($specific) {
-            $hosts = Host::where('db_host', $specific)->with('databases.tables')->get();
-        } else {
-            $hosts = Host::select()->with('databases.tables')->get();
-        }
+        // Lets gooooo
+        $hosts = Host::select()->with('databases.tables')->get();
 
         // Process each host in turn
         foreach ($hosts as $host) 

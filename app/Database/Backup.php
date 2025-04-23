@@ -141,7 +141,7 @@ class Backup
 
         // Are we going??
         if ($count > 0) {
-            $progress = progress(label: 'Updating '.$this->table->table_name, steps: $count);
+            $progress = progress(label: ($this->table->always_resync ? 'Resyncing' : 'Updating').' '.$this->table->table_name, steps: $count);
             $progress->start();
 
             // Get the data

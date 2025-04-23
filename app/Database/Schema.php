@@ -13,6 +13,7 @@ use function Laravel\Prompts\progress;
 
 use App\Models\Table;
 use App\Models\State;
+use App\Models\Config;
 
 class Schema
 {
@@ -76,11 +77,21 @@ class Schema
 
     public function create_tables_in_tables_db(array $tables): void
     {
+        // Grab the global config
+        $always_resync = explode(' ', str_replace(["\n", "\r\n", "\r"], ' ', Config::get('always_resync_tables')));
+        $always_inactive = explode(' ', str_replace(["\n", "\r\n", "\r"], ' ', Config::get('always_inactive_tables')));
+
+        // Add those tables
         foreach ($tables as $table) {
             if (!Table::where('database_id', $this->database_id)->where('table_name', $table)->first()) {
                 $create = new Table();
                 $create->database_id = $this->database_id;
                 $create->table_name = $table;
+
+                // Apply global config
+                if (in_array($table, $always_resync)) { $create->always_resync = 1; }
+                if (in_array($table, $always_inactive)) { $create->is_active = 0; }
+
                 $create->save();
             }
         }

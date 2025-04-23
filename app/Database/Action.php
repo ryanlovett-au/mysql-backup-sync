@@ -19,7 +19,7 @@ use App\Models\Config;
 
 class Action
 {
-	public static function go(array $options = [], string $specific = null): void
+	public static function go(array $options = [], bool $cli = false, string $specified_host = null, string $specified_database = null): void
 	{
 		clear();
 
@@ -32,6 +32,13 @@ class Action
         // Process each host in turn
         foreach ($hosts as $host) 
         {
+            // Allow for specifying specific hosts
+            if (!is_null($specified_host)) {
+                if (($host->ssh_host ? $host->ssh_host : $host->db_host) != $specified_host) {
+                    continue;                    
+                }
+            }
+
             if ($host->databases->count() === 0) {
             	continue;
             }
@@ -49,6 +56,11 @@ class Action
             // Fot this host, process each database in turn
             foreach ($host->databases as $database) 
             {
+                // Allow for specifying specific databases
+                if (!is_null($specified_database) && ($database->database_name != $specified_database)) {
+                    continue;
+                }
+
                 info('Database: '.$database->database_name."\n");
 
                 // Create connections in the Laravel config for the remote and local instance of this database
@@ -88,7 +100,7 @@ class Action
                     $backup = new Backup($database, $connect->local_db, $table);
 
                     try {
-	                    $backup->action();
+	                    $backup->action($cli);
 	                } catch (\Exception $e) {
                         if ($e->errorInfo[1] == 2006) {
                             alert('Error: Remote server reported out of memory error.');
@@ -98,8 +110,12 @@ class Action
                         }
 
 	                	self::notify($database, false);
-                        pause();
-	                	break;
+                        
+                        if (!$cli) {
+                            pause();
+                        }
+	                	
+                        break;
 	                }
                 }
 

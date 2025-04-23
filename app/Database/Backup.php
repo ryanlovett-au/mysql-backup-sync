@@ -50,11 +50,15 @@ class Backup
         }
     }
 
-    public function action()
+    public function action($cli = false)
     {
         if (!$this->table) {
             alert('Table config not found, consider re-sycning tables.');
-            pause();
+            
+            if (!$cli) {
+                pause();
+            }
+            
             return;
         }
 

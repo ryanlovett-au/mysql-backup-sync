@@ -101,6 +101,10 @@ class Menu_Local
                     elseif ($config->key == 'always_inactive_tables') {
                         Table::where('table_name', $table)->update(['is_active' => 0]);
                     }
+
+                    elseif ($config->key == 'always_use_primary_key') {
+                        Table::where('table_name', $table)->update(['always_primary_key' => 1]);
+                    }
                 }
             }
         }

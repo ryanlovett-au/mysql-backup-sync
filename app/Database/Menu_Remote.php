@@ -216,6 +216,7 @@ class Menu_Remote
                 $options['table_'.$table->id] = $table->table_name;
                 $options['table_'.$table->id] .= !$table->is_active ? ' (inactive)' : '';
                 $options['table_'.$table->id] .= $table->always_resync ? ' (resync)' : '';
+                $options['table_'.$table->id] .= $table->always_primary_key ? ' (primary key)' : '';
             }
         }
 
@@ -313,8 +314,9 @@ class Menu_Remote
             label: 'Configure Table '.$table->table_name.' for '.$database->database_name,
             options: [
                 '-' => '-------------------- Config ----------------------',
-                'always_resync' => 'ALWAYS RESYNC = '.$table->always_resync,
-                'is_active'     => 'IS ACTIVE     = '.$table->is_active,
+                'always_resync'      => 'ALWAYS RESYNC          = '.$table->always_resync,
+                'always_primary_key' => 'ALWAYS USE PRIMARY KEY = '.$table->always_primary_key,
+                'is_active'          => 'IS ACTIVE              = '.$table->is_active,
                 '--' => '--------------------------------------------------',
                 'back' => 'Back'
             ],

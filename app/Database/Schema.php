@@ -80,6 +80,7 @@ class Schema
         // Grab the global config
         $always_resync = explode(' ', str_replace(["\n", "\r\n", "\r"], ' ', Config::get('always_resync_tables')));
         $always_inactive = explode(' ', str_replace(["\n", "\r\n", "\r"], ' ', Config::get('always_inactive_tables')));
+        $always_primary = explode(' ', str_replace(["\n", "\r\n", "\r"], ' ', Config::get('always_use_primary_key')));
 
         // Add those tables
         foreach ($tables as $table) {
@@ -91,6 +92,7 @@ class Schema
                 // Apply global config
                 if (in_array($table, $always_resync)) { $create->always_resync = 1; }
                 if (in_array($table, $always_inactive)) { $create->is_active = 0; }
+                if (in_array($table, $always_primary)) { $create->always_primary_key = 1; }
 
                 $create->save();
             }

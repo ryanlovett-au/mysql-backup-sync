@@ -107,7 +107,7 @@ class Backup
                 ->count();
         }
 
-        else if ($timestamps) {
+        else if ($timestamps && !$this->table->always_primary_key) {
             if (empty($this->state->last_updated_at)) {
                 $this->state->last_updated_at = '1900-01-01 00:00:01';
             }

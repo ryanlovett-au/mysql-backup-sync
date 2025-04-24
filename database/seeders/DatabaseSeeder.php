@@ -25,5 +25,8 @@ class DatabaseSeeder extends Seeder
         // Added around v0.2.1
         Config::firstOrCreate(['key' => 'always_resync_tables'], ['key' => 'always_resync_tables', 'field_type' => 'textarea', 'value' => null]);
         Config::firstOrCreate(['key' => 'always_inactive_tables'], ['key' => 'always_inactive_tables', 'field_type' => 'textarea', 'value' => null]);
+
+        // Added around v0.3
+        Config::firstOrCreate(['key' => 'always_use_primary_key'], ['key' => 'always_use_primary_key', 'field_type' => 'textarea', 'value' => null]);
     } 
 }

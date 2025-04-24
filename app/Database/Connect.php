@@ -31,7 +31,7 @@ class Connect
         $this->local_port = $this->get_tunnel_port();
 
         // Command
-        $command = ['ssh', '-N', '-L', $this->local_port.':'.$host->db_host.':'.$host->db_port, $host->ssh_username.'@'.$host->ssh_host, '-p', $host->ssh_port];
+        $command = ['ssh', '-C', '-N', '-L', $this->local_port.':'.$host->db_host.':'.$host->db_port, $host->ssh_username.'@'.$host->ssh_host, '-p', $host->ssh_port];
 
         // Authenticate
         if (!empty($host->ssh_private_key_path)) {

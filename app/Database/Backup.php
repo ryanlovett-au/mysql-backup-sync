@@ -10,6 +10,7 @@ use function Laravel\Prompts\alert;
 use function Laravel\Prompts\progress;
 use function Laravel\Prompts\pause;
 
+use App\Models\Config;
 use App\Models\Table;
 use App\Models\State;
 
@@ -145,9 +146,9 @@ class Backup
             $progress->start();
 
             // Get the data
-            $query->chunk(10000, function ($rows) use ($progress, $primary_key, $timestamps) {
+            $query->chunk(Config::get('select_count'), function ($rows) use ($progress, $primary_key, $timestamps) {
             
-                foreach ($rows->chunk(1000) as $fewerows)
+                foreach ($rows->chunk(Config::get('update_count')) as $fewerows)
                 {
                     // Cast rows to arrays
                     $fewerows = array_map(function ($row) {

@@ -21,7 +21,7 @@ class Action
 {
 	public static function go(array $options = [], bool $cli = false, string $specified_host = null, string $specified_database = null): void
 	{
-		clear();
+        clear();
 
         // Lets gooooo
         $hosts = Host::select()->with('databases.tables')->get();
@@ -105,14 +105,12 @@ class Action
                             alert('This is most commonly due to sorts of non-indexed columns in tables with large row sizes.');
                             alert('The last table attempted above is the table that generated the error.');
                             alert('Check that your updated_at column is indexed for this table, or set this table to always resync.');
+                        } else {
+                            alert('Error: '.$e->errorInfo[1]);
                         }
 
 	                	self::notify($database, false);
-                        
-                        if (!$cli) {
-                            pause();
-                        }
-	                	
+                        if (!$cli) { pause(); }
                         break;
 	                }
                 }

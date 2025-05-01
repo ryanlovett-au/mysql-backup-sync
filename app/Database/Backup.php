@@ -147,7 +147,7 @@ class Backup
             // Get the data
             $query->chunk(10000, function ($rows) use ($progress, $primary_key, $timestamps) {
             
-                foreach ($rows->chunck(1000) as $fewerows)
+                foreach ($rows->chunk(1000) as $fewerows)
                 {
                     // Cast rows to arrays
                     $fewerows = array_map(function ($row) {

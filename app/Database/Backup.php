@@ -145,28 +145,31 @@ class Backup
             $progress->start();
 
             // Get the data
-            $query->chunk(500, function ($rows) use ($progress, $primary_key, $timestamps) {
+            $query->chunk(10000, function ($rows) use ($progress, $primary_key, $timestamps) {
             
-                // Cast rows to arrays
-                $rows = array_map(function ($row) {
-                    return (array) $row;
-                }, $rows->toArray());
+                foreach ($rows->chunck(1000) as $fewerows)
+                {
+                    // Cast rows to arrays
+                    $fewerows = array_map(function ($row) {
+                        return (array) $row;
+                    }, $fewerows->toArray());
 
-                // Insert
-                DB::connection($this->local_db)
-                    ->table($this->table->table_name)
-                    ->upsert($rows, [],
-                        DBSchema::connection($this->local_db)
-                            ->getColumnListing($this->table->table_name)
-                    );
+                    // Insert
+                    DB::connection($this->local_db)
+                        ->table($this->table->table_name)
+                        ->upsert($fewerows, [],
+                            DBSchema::connection($this->local_db)
+                                ->getColumnListing($this->table->table_name)
+                        );
 
-                // Update state as we go - only use primary key as that is how we are getting source rows
-                $last = end($rows);
-                $this->state->last_updated_at = $timestamps ? $last['updated_at'] : null;
-                $this->state->last_id = $last[$primary_key] ?? null;
-                $this->state->save();
+                    // Update state as we go - only use primary key as that is how we are getting source rows
+                    $last = end($fewerows);
+                    $this->state->last_updated_at = $timestamps ? $last['updated_at'] : null;
+                    $this->state->last_id = $last[$primary_key] ?? null;
+                    $this->state->save();
 
-                $progress->advance(count($rows));
+                    $progress->advance(count($fewerows));
+                } 
             });
 
             $progress->finish(); echo "\n";

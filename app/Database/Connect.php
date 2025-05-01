@@ -86,8 +86,10 @@ class Connect
 
     public function disconnect_tunnel(): void
     {
-        exec("kill " . escapeshellarg($this->tunnel->getPid()), $output, $code);
-        $this->tunnel = null;
+        if (is_numeric($this->tunnel->getPid())) {
+            exec("kill " . escapeshellarg($this->tunnel->getPid()), $output, $code);
+            $this->tunnel = null;
+        }
 
         note('');
     }

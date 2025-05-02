@@ -182,6 +182,12 @@ As this application is primarily designed to support Laravel applications, the r
 
  Whilst you *can* use mysqldump or other similar applications to copy the structure and data from the backup, OR simply steer your application to use the backup as its new primary database, this is not a recommended approach.
 
+## Troubleshooting
+
+You may encounter errors during your use of this application, they are detailed here:
+ - Error 1390: You are trying to insert/update too many rows (or too many rows with too many columns), reduce the chunk value on updates in the local config. 500 has proven to be a good balance of performance and stability.
+ - Error 2006: The database server has run out of memory or otherwise gone away. This is generally due to a select size (number of rows) that are sorting unindexed columns in memory. Confirm indexes exist and/or reduce the nubmer of rows being selected in each chuck and/or do whole table resyncs (which do not sort) if the table is small enough.
+
 ## Contributing
 
 PR's are always welcome.

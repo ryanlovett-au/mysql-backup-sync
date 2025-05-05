@@ -39,7 +39,7 @@ class Menu_Remote
         }
 
     	$next = select(
-            label: 'Configure Source (Remote) Host/Database - '.($host->ssh_host ? $host->ssh_host.' ('.$host->db_host.')' : $host->db_host),
+            label: 'Configure Source (Original) Host/Database - '.($host->ssh_host ? $host->ssh_host.' ('.$host->db_host.')' : $host->db_host),
             options: self::remote_config_host_options($host),
             scroll: 25,
             required: true

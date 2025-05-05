@@ -26,7 +26,7 @@ class Menu_Local
     	Menu::header();
 
     	$next = select(
-            label: 'Configure Local (Backup) Host/Database',
+            label: 'Configure Destination (Backup) Host/Database',
             options: self::local_config_options(),
             scroll: 20,
             required: true

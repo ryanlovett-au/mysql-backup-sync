@@ -104,9 +104,9 @@ class Menu
     {
         $options = [];
 
-        $options['local'] = 'Configure Destination (Local) Host/Database';
-        $options['-'] = '----------------- Remote Hosts -------------------';
-        $options['add'] = 'Add Remote Host/Database';
+        $options['local'] = 'Configure Destination (Backup) Host/Database';
+        $options['-'] = '----------------- Source Hosts -------------------';
+        $options['add'] = 'Add Source Host/Database';
 
         if ($hosts = Host::all()) {
         	foreach ($hosts as $host) {

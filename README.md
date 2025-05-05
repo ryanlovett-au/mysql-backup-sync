@@ -31,12 +31,12 @@ If you are super keen you can edit entries in this database directly, however I 
 
 Simply run `php artisan db:menu`.
 
-### Configure Destination (local) Database 
+### Configure Destination (Backup) Database 
 
 The first step is to configure a destination (local/backup) database, this can be any MySQL database, however it should be directly accessible from the host running this application, preferably on the same machine or a low latency link.
 
 ```
- ┌ Configure Destination (Local) Host/Database ─────────────────┐
+ ┌ Configure Destination (Backup) Host/Database ────────────────┐
  │   ○ -------------------- Config ----------------------       │
  │   ○ BACKUP DB HOST     = 127.0.0.1                           │
  │   ○ BACKUP DB PORT     = 3306                                │
@@ -50,12 +50,12 @@ The first step is to configure a destination (local/backup) database, this can b
 
 **Note:** The MySQL server you are using for backups really *must* have a matching timezone to the remote source servers. You can override this check here, however it is likely you will get timestamp/datetime errors during sync. You have been warned!
 
-### Configure Source (Remote) Hosts
+### Configure Source (Original) Hosts
 
 You can then proceed to configure any number of source (remote/original) hosts.
 
 ```
- ┌ Configure Source (Remote) Host/Database ─────────────────────┐
+ ┌ Configure Source (Original) Host/Database ───────────────────┐
  │ › ● -------------------- Config ----------------------       │
  │   ○ DB HOST                    =                             │
  │   ○ DB PORT                    = 3306                        │

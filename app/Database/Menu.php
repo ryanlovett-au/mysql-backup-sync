@@ -104,7 +104,7 @@ class Menu
     {
         $options = [];
 
-        $options['local'] = 'Configure Local (Backup) Host/Database';
+        $options['local'] = 'Configure Destination (Local) Host/Database';
         $options['-'] = '----------------- Remote Hosts -------------------';
         $options['add'] = 'Add Remote Host/Database';
 

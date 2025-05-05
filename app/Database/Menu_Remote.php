@@ -39,7 +39,7 @@ class Menu_Remote
         }
 
     	$next = select(
-            label: 'Configure Remote (Original) Host/Database - '.($host->ssh_host ? $host->ssh_host.' ('.$host->db_host.')' : $host->db_host),
+            label: 'Configure Source (Remote) Host/Database - '.($host->ssh_host ? $host->ssh_host.' ('.$host->db_host.')' : $host->db_host),
             options: self::remote_config_host_options($host),
             scroll: 25,
             required: true
@@ -94,7 +94,7 @@ class Menu_Remote
 
         if ($host->id) {
             $options['--'] = '------------------- Databases --------------------';
-            $options['database_new'] = 'Add Remote Database';
+            $options['database_new'] = 'Add Source Database';
 
             foreach ($host->databases as $database) {
                 $options['database_'.$database->id] = $database->database_name;
@@ -274,7 +274,7 @@ class Menu_Remote
 
         alert('You are about to delete the record for database: '.$database->database_name.'.');
 
-        alert('This will delete all associated backed up (local) data!');
+        alert('This will delete all associated backed up (destination) data!');
 
         $confirmed = confirm(label: 'Are you sure?', default: false,);
 

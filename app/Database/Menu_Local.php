@@ -84,7 +84,7 @@ class Menu_Local
                 hint: 'A list of table names separated by newlines...'
             );
 
-            $confirmed = confirm('All matching tables in the remote databases config will now be updated with this setting. Are you sure?');
+            $confirmed = confirm('All matching tables in the source databases config will now be updated with this setting. Are you sure?');
 
             if ($confirmed) {
                 $config->value = $update;

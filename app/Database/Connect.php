@@ -96,7 +96,7 @@ class Connect
 
     public function setup_remote_db($host, $database): void
     {
-        $progress = progress(label: 'Configuring remote (original) database', steps: 1);
+        $progress = progress(label: 'Configuring source (remote) database', steps: 1);
         $progress->start();
 
         // Disconnect previous connections and reset config
@@ -133,7 +133,7 @@ class Connect
 
     public function setup_local_db($host, $database, $create = true): void
     {
-        $progress = progress(label: 'Configuring local (backup) database', steps: 1);
+        $progress = progress(label: 'Configuring destination (local) database', steps: 1);
         $progress->start();
 
         // Disconnect previous connections and reset config
@@ -191,7 +191,7 @@ class Connect
                     // Disconnect to force reconnection next time
                     DB::disconnect($this->local_db);
                 } else {
-                    alert('Error: Local database does not exist and not able to be created.');
+                    alert('Error: Destination database does not exist and not able to be created.');
 
                     $this->disconnect_tunnel();
                     
@@ -226,7 +226,7 @@ class Connect
         }
 
         if ($remote != $local) {
-            alert('Error: Local database timezone ('.$local.') does not match remote database timezone ('.$remote.'). This will likely cause issues with datetime object synchronisation during DST transitions. Please correct this issue.');
+            alert('Error: Destination database timezone ('.$local.') does not match source database timezone ('.$remote.'). This will likely cause issues with datetime object synchronisation during DST transitions. Please correct this issue.');
 
             $this->disconnect_tunnel();
 

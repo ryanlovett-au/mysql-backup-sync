@@ -61,11 +61,11 @@ class Action
 
                     info('Database: '.$database->database_name."\n");
 
-                    // Create connections in the Laravel config for the remote and local instance of this database
+                    // Create connections in the Laravel config for the source and destiantion instance of this database
                     $connect->setup_remote_db($host, $database);
                     $connect->setup_local_db($host, $database);
 
-                    // Check remote and local server timezones match
+                    // Check source and destination server timezones match
                     if (!in_array('skip-tz-check', $options) && (!is_null(Config::get('skip_tz_check')) && Config::get('skip_tz_check') == '0')) {
                         $connect->check_tz();
                     }
@@ -74,7 +74,7 @@ class Action
                     $schema = new Schema($database, $connect->local_db);
                     $schema->get_tables_lists();
 
-                    // For tables that exist on both the remote and local, check to see if the table structure has chnaged
+                    // For tables that exist on both the source and destination, check to see if the table structure has chnaged
                     if (count($schema->check_local) > 0) {
                         $reset_tables = $schema->check_tables();
 
@@ -83,7 +83,7 @@ class Action
                         $schema->create_local = array_merge($schema->create_local, $reset_tables);
                     }
 
-                    // Remove any tables that have been dropped from the remote
+                    // Remove any tables that have been dropped from the source
                     if (count($schema->remove_local) > 0) {
                         $schema->remove_local();
                     }
@@ -102,7 +102,7 @@ class Action
     	                    $backup->action($cli);
     	                } catch (\Exception $e) {
                             if ($e->errorInfo[1] == 2006) {
-                                alert('Error: Remote server reported out of memory error.');
+                                alert('Error: Source server reported out of memory error.');
                                 alert('This is most commonly due to sorts of non-indexed columns in tables with large row sizes.');
                                 alert('The last table attempted above is the table that generated the error.');
                                 alert('Check that your updated_at column is indexed for this table, or set this table to always resync.');

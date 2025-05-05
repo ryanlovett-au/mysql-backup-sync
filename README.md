@@ -31,12 +31,12 @@ If you are super keen you can edit entries in this database directly, however I 
 
 Simply run `php artisan db:menu`.
 
-### Configure Local Database 
+### Configure Destination (local) Database 
 
-The first step is to configure a local database, this can be any MySQL database, however it should be directly accessible from the host running this application, preferably on the same machine or a low latency link.
+The first step is to configure a destination (local/backup) database, this can be any MySQL database, however it should be directly accessible from the host running this application, preferably on the same machine or a low latency link.
 
 ```
- ┌ Configure Local (Backup) Host/Database ──────────────────────┐
+ ┌ Configure Destination (Local) Host/Database ─────────────────┐
  │   ○ -------------------- Config ----------------------       │
  │   ○ BACKUP DB HOST     = 127.0.0.1                           │
  │   ○ BACKUP DB PORT     = 3306                                │
@@ -50,12 +50,12 @@ The first step is to configure a local database, this can be any MySQL database,
 
 **Note:** The MySQL server you are using for backups really *must* have a matching timezone to the remote source servers. You can override this check here, however it is likely you will get timestamp/datetime errors during sync. You have been warned!
 
-### Configure Remote Hosts
+### Configure Source (Remote) Hosts
 
-You can then proceed to configure any number of remote hosts.
+You can then proceed to configure any number of source (remote/original) hosts.
 
 ```
- ┌ Configure Remote (Original) Host/Database -  ────────────────┐
+ ┌ Configure Source (Remote) Host/Database ─────────────────────┐
  │ › ● -------------------- Config ----------------------       │
  │   ○ DB HOST                    =                             │
  │   ○ DB PORT                    = 3306                        │
@@ -75,19 +75,19 @@ You can then proceed to configure any number of remote hosts.
  └──────────────────────────────────────────────────────────────┘
 ```
 
-Remote hosts can be directly connected servers, or this application can tunnel MySQL connections over an SSH tunnel. 
+Source hosts can be directly connected servers, or this application can tunnel MySQL connections over an SSH tunnel. 
 
-If using an SSH tunnel, the DB HOST must be the IP or hostname of the database server relative to the remote SSH endpoint. The DB PORT must be the port of the remote MySQL server. You can either user a non-passphrase protected SSH key pair or a SSH password for this connection. All other ports are managed dynamically by this application.
+If using an SSH tunnel, the DB HOST must be the IP or hostname of the database server relative to the remote SSH endpoint. The DB PORT must be the port of the source MySQL server. You can either user a non-passphrase protected SSH key pair or a SSH password for this connection. All other ports are managed dynamically by this application.
 
 You can then test your connection using the menu option provided.
 
-### Configure Remote Databases
+### Configure Source Databases
 
-Once you have configured a remote host you can then proceed to add a database.
+Once you have configured a source host you can then proceed to add a database.
 
 ```
  │   ○ ------------------- Databases --------------------    │
- │   ○ Add Remote Database                                   │
+ │   ○ Add Source Database                                   │
  │   ○ dispatch_dev                                          │
  │   ○ --------------------------------------------------    │
  ```
@@ -105,7 +105,7 @@ Once you have configured a remote host you can then proceed to add a database.
  └─────────────────────────────────────────────────────────────────┘
  ```
 
-Once you have provided a database name, this application will then attempt to connect to that remote database and populate a list of tables.
+Once you have provided a database name, this application will then attempt to connect to that source database and populate a list of tables.
 
 ```
  ┌ Configure Database for 127.0.0.1 ───────────────────────────────┐
@@ -147,7 +147,7 @@ The application will then iterate through every host and database and backup/syn
 
 *You may also use the `php artisan db:backup --host= --database=` arguments to target a specific host and/or database from the command line.* 
 
-During this process the application will first compare the schemas of the remote and local backups and determine if tables have been added or removed from the remote and will action those changes on the local copy as required.
+During this process the application will first compare the schemas of the source and destination backups and determine if tables have been added or removed from the source and will action those changes on the destination copy as required.
 
 **Note:** Renaming a table will results in remove + add/resync.
 

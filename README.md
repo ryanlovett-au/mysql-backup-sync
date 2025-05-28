@@ -81,6 +81,8 @@ If using an SSH tunnel, the DB HOST must be the IP or hostname of the database s
 
 You can then test your connection using the menu option provided.
 
+If you would like to use SSH Passwords, then you will likely need to install the `sshpass` package. For SSH key authentication, no additonal packages are required.
+
 ### Configure Source Databases
 
 Once you have configured a source host you can then proceed to add a database.

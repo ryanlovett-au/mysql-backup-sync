@@ -41,7 +41,7 @@ class Connect
             //     $command = $command + ['-o', 'IdentityFile='.$host->ssh_private_key_passphrase]; // May be needed for passphrase
             // }
         } else if (!empty($host->ssh_password)) {
-            $command = ['sshpass', '-p', $host->ssh_password] + $command;
+            $command = array_merge(['sshpass', '-p', $host->ssh_password], $command);
         }
 
         // Tunnel

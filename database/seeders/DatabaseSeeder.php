@@ -32,5 +32,8 @@ class DatabaseSeeder extends Seeder
         // Added around v0.4
         Config::firstOrCreate(['key' => 'select_count'], ['key' => 'select_count', 'field_type' => 'text', 'value' => 50000]);
         Config::firstOrCreate(['key' => 'update_count'], ['key' => 'update_count', 'field_type' => 'text', 'value' => 2500]);
+
+        // Added around 0.5
+        Config::firstOrCreate(['key' => 'keep_db_names'], ['key' => 'keep_db_names', 'field_type' => 'text', 'value' => null]);
     } 
 }

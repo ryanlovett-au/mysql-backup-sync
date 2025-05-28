@@ -143,8 +143,12 @@ class Connect
         }
 
         // Format local db names (max 64 utf8 characters)
-        $len = 55 - iconv_strlen($database->database_name);
-        $db_name = 'backup_'.substr(str_replace('.', '', $host->ssh_host ? $host->ssh_host : $host->db_host), 0, $len).'_'.$database->database_name;
+        if (Config::get('keep_db_names')) {
+            $db_name = $database->database_name;
+        } else {
+            $len = 55 - iconv_strlen($database->database_name);
+            $db_name = 'backup_'.substr(str_replace('.', '', $host->ssh_host ? $host->ssh_host : $host->db_host), 0, $len).'_'.$database->database_name;
+        }
 
         // DB Connect
         $connect = [

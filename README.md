@@ -12,6 +12,8 @@ This is a TUI application written in the Laravel framework. It requires:
  - PHP v8.2+ (with MySQL, SQLite, DOM/XML and CURL extensions - For Ubuntu 24.04 php8.3-xml php8.3-curl php-sqlite3 php-mysql)
  - A MySQL database in which to store backups
 
+**Note:** MySQL ships with a 128MB buffer pool, which is nowhere near enough for a destination holding tens of gigabytes. Give `innodb_buffer_pool_size` as much as the machine can spare, and set `innodb_flush_method` to `O_DIRECT` so pages are not cached twice.
+
 ## Installation
 
 To install:
@@ -175,6 +177,8 @@ The application will then iterate through every host and database and backup/syn
  └─────────────────────────────────────────── 2090000/399013679 ┘
   About 16h 24m remaining
 ```
+
+The memory limit is raised at the start of a run to a share of what the host has free, since batches are held in memory in full. It takes half of what is available, never more than 2G, and never so much that the host is left short.
 
 A row count marked with a `~` is the source server's own estimate rather than a count, used where counting the table would take longer than you would care to wait for. The time remaining is worked out from the last few batches, so it follows what the link is doing now rather than averaging the whole run.
 

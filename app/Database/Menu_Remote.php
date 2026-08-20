@@ -296,7 +296,7 @@ class Menu_Remote
 
             $db_name = Connect::local_db_name($host, $database);
 
-            DB::connection($connect->local_db)->statement('DROP DATABASE IF EXISTS '.$db_name.';');
+            DB::connection($connect->local_db)->statement('DROP DATABASE IF EXISTS '.Sql::quote($db_name).';');
 
             // Delete all state
             State::where('host_id', $host->id)->where('database_id', $database->id)->delete();

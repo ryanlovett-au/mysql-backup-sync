@@ -248,7 +248,7 @@ class Connect
             AppConfig::set('database.connections.'.$this->local_db, $connect);
 
             // Reconnect and create database
-            DB::reconnect($this->local_db)->statement('CREATE DATABASE IF NOT EXISTS '.$db_name.';');
+            DB::reconnect($this->local_db)->statement('CREATE DATABASE IF NOT EXISTS '.Sql::quote($db_name).';');
 
             // Reapply database name
             $connect['database'] = $db_name;

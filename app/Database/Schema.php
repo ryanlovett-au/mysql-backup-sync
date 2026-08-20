@@ -118,8 +118,8 @@ class Schema
         foreach ($this->check_local as $table) {
 
             // Get table structures
-            $remote = DB::connection($this->remote_db)->selectOne('SHOW CREATE TABLE '.$table)->{'Create Table'};
-            $local = DB::connection($this->local_db)->selectOne('SHOW CREATE TABLE '.$table)->{'Create Table'};
+            $remote = DB::connection($this->remote_db)->selectOne('SHOW CREATE TABLE '.Sql::quote($table))->{'Create Table'};
+            $local = DB::connection($this->local_db)->selectOne('SHOW CREATE TABLE '.Sql::quote($table))->{'Create Table'};
 
             // Drop variable elements from the statement
             $remote = $this->cleanup_create($remote);
@@ -175,7 +175,7 @@ class Schema
 
         foreach ($this->create_local as $table) {
             // Get table structure
-            $create = DB::connection($this->remote_db)->selectOne('SHOW CREATE TABLE '.$table);
+            $create = DB::connection($this->remote_db)->selectOne('SHOW CREATE TABLE '.Sql::quote($table));
 
             // Create locally
             DB::connection($this->local_db)->statement($create->{'Create Table'});

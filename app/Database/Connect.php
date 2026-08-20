@@ -186,9 +186,9 @@ class Connect
         // Check that the databse exists
         try {
             DB::connection($this->local_db)->getPDO();
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             // Database not created
-            if ($e->errorInfo[1] == 1049) {
+            if (Error::code($e) == 1049) {
                 // Create missing database
                 if ($create) {
                     // Null out databse

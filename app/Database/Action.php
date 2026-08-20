@@ -96,14 +96,14 @@ class Action
 
                         try {
                             $backup->action($cli);
-                        } catch (\Exception $e) {
-                            if ($e->errorInfo[1] == 2006) {
+                        } catch (\Throwable $e) {
+                            if (Error::code($e) == 2006) {
                                 alert('Error: Source server reported out of memory error.');
                                 alert('This is most commonly due to sorts of non-indexed columns in tables with large row sizes.');
                                 alert('The last table attempted above is the table that generated the error.');
                                 alert('Check that your updated_at column is indexed for this table, or set this table to always resync.');
                             } else {
-                                alert('Error: '.$e->errorInfo[1]);
+                                alert('Error: '.Error::describe($e));
                             }
 
                             self::notify($database, false);
@@ -115,8 +115,8 @@ class Action
                             break;
                         }
                     }
-                } catch (\Exception $e) {
-                    alert('Error: '.$e->errorInfo[1]);
+                } catch (\Throwable $e) {
+                    alert('Error: '.Error::describe($e));
 
                     self::notify($database, false);
 

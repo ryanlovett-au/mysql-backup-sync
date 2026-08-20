@@ -26,6 +26,9 @@ class Action
         // Lets gooooo
         $hosts = Host::select()->with('databases.tables')->get();
 
+        // Start with a clean set of warnings, the menu can run this more than once per session
+        Backup::$missing_timestamp_indexes = [];
+
         // Process each host in turn
         foreach ($hosts as $host) 
         {
@@ -134,6 +137,13 @@ class Action
             // Disconnect any SSH tunnels for this host
             info('End host: '.($host->ssh_host ? $host->ssh_host : $host->db_host));
             spin(message: 'Closing SSH tunnel', callback: fn () => $connect->disconnect_tunnel());
+        }
+
+        // Report any tables that are tracking by updated_at without an index to support it
+        Backup::report_missing_indexes();
+
+        if (!$cli && count(Backup::$missing_timestamp_indexes) > 0) {
+            pause();
         }
 	}
 

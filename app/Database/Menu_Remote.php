@@ -285,8 +285,7 @@ class Menu_Remote
             $connect = new Connect;
             $connect->setup_local_db($host, $database);
 
-            $len = 55 - iconv_strlen($database->database_name);
-            $db_name = 'backup_'.substr(str_replace('.', '', $host->ssh_host ? $host->ssh_host : $host->db_host), 0, $len).'_'.$database->database_name;
+            $db_name = Connect::local_db_name($host, $database);
 
             DB::connection($connect->local_db)->statement('DROP DATABASE IF EXISTS '.$db_name.';');
 

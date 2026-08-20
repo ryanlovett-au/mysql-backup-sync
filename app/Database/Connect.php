@@ -141,6 +141,22 @@ class Connect
         echo "\n";
     }
 
+    /**
+     * The name this database is backed up under on the destination server. Anything that needs to
+     * reach that database has to ask here, working it out a second time is how you drop the wrong one.
+     */
+    public static function local_db_name($host, $database): string
+    {
+        // Format local db names (max 64 utf8 characters)
+        if (Config::get('keep_db_names')) {
+            return $database->database_name;
+        }
+
+        $len = 55 - iconv_strlen($database->database_name);
+
+        return 'backup_'.substr(str_replace('.', '', $host->ssh_host ? $host->ssh_host : $host->db_host), 0, $len).'_'.$database->database_name;
+    }
+
     public function setup_local_db($host, $database, $create = true): void
     {
         $progress = progress(label: 'Configuring destination (local) database', steps: 1);
@@ -152,13 +168,7 @@ class Connect
             $this->local_db = null;
         }
 
-        // Format local db names (max 64 utf8 characters)
-        if (Config::get('keep_db_names')) {
-            $db_name = $database->database_name;
-        } else {
-            $len = 55 - iconv_strlen($database->database_name);
-            $db_name = 'backup_'.substr(str_replace('.', '', $host->ssh_host ? $host->ssh_host : $host->db_host), 0, $len).'_'.$database->database_name;
-        }
+        $db_name = self::local_db_name($host, $database);
 
         // DB Connect
         $connect = [

@@ -283,12 +283,18 @@ class Connect
 
         AppConfig::set('database.connections.test', $connect);
 
+        // Connections are cached by name, so without this we would re-test the previous host and
+        // report its result against this one
+        DB::purge('test');
+
         try {
             DB::connection('test')->getPDO();
             info('Connection successful!');
-        } catch (\Exception $e) {
-            error('Connection FAILED');
+        } catch (\Throwable $e) {
+            error('Connection FAILED: '.Error::describe($e));
         }
+
+        DB::purge('test');
 
         if ($host->use_ssh_tunnel) {
             spin(message: 'Closing SSH tunnel', callback: fn () => $this->disconnect_tunnel());

@@ -33,8 +33,13 @@ class Backup
     // Below this many rows an exact count is quick, above it we take the estimate and show a ~
     public const ESTIMATE_ABOVE = 10000;
 
-    // Only start estimating how long a table has left once it has been running this many seconds
-    public const ETA_AFTER = 60;
+    // Say nothing about time remaining for the first twenty seconds, then wait for a few batches so
+    // the rate has settled - but never stay quiet past ETA_BY, however slow the batches are
+    public const ETA_AFTER = 20;
+
+    public const ETA_BATCHES = 3;
+
+    public const ETA_BY = 30;
 
     // Tables tracking by updated_at with no index to support it, collected across the whole run
     public static array $missing_timestamp_indexes = [];
@@ -204,15 +209,19 @@ class Backup
     }
 
     /**
-     * How much longer this table looks like taking, based on the rate so far. Stays quiet for the
-     * first minute, since a short sync finishes before an estimate would be worth reading, and the
-     * rate over the first few batches is not yet a fair guide to the rest.
+     * How much longer this table looks like taking, based on the rate so far. Holds off until there
+     * is enough to go on - the very first batch carries the connection and query setup with it, so
+     * a rate taken from that alone reads far worse than the table actually runs.
      */
-    protected function eta(float $started, int $done, int $total): ?string
+    protected function eta(float $started, int $done, int $total, int $batches): ?string
     {
         $elapsed = microtime(true) - $started;
 
-        if ($elapsed < self::ETA_AFTER || $done < 1 || $done >= $total) {
+        if ($done < 1 || $done >= $total) {
+            return null;
+        }
+
+        if ($elapsed < self::ETA_AFTER || ($batches < self::ETA_BATCHES && $elapsed < self::ETA_BY)) {
             return null;
         }
 
@@ -366,7 +375,9 @@ class Backup
             $columns = DBSchema::connection($this->local_db)
                 ->getColumnListing($this->table->table_name);
 
-            $write = function ($rows) use ($progress, $primary_key, $timestamps, $update_count, $columns, $started, $count) {
+            $batches = 0;
+
+            $write = function ($rows) use ($progress, $primary_key, $timestamps, $update_count, $columns, $started, $count, &$batches) {
 
                 foreach ($rows->chunk($update_count) as $fewerows) {
                     // Cast rows to arrays
@@ -385,8 +396,10 @@ class Backup
                     $this->state->last_id = $last[$primary_key] ?? null;
                     $this->state->save();
 
+                    $batches++;
+
                     // Set before advancing, that is what draws it
-                    if ($eta = $this->eta($started, $progress->progress + count($fewerows), $count)) {
+                    if ($eta = $this->eta($started, $progress->progress + count($fewerows), $count, $batches)) {
                         $progress->hint($eta);
                     }
 

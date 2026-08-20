@@ -35,6 +35,8 @@ class Connect
         $command = ['ssh', '-C', '-N', '-L', $this->local_port.':'.$host->db_host.':'.$host->db_port, $host->ssh_username.'@'.$host->ssh_host, '-p', $host->ssh_port];
 
         // Authenticate
+        $env = null;
+
         if (! empty($host->ssh_private_key_path)) {
             $command = array_merge($command, ['-i', $host->ssh_private_key_path]);
 
@@ -42,11 +44,15 @@ class Connect
             //     $command = $command + ['-o', 'IdentityFile='.$host->ssh_private_key_passphrase]; // May be needed for passphrase
             // }
         } elseif (! empty($host->ssh_password)) {
-            $command = array_merge(['sshpass', '-p', $host->ssh_password], $command);
+            // -e takes the password from the environment rather than the command line. A command line
+            // is world readable through ps, an environment is readable only by its owner and root.
+            $command = array_merge(['sshpass', '-e'], $command);
+
+            $env = ['SSHPASS' => $host->ssh_password];
         }
 
-        // Tunnel
-        $this->tunnel = new Process($command);
+        // Tunnel. No timeout - it is meant to stay up for as long as the sync takes.
+        $this->tunnel = new Process($command, null, $env, null, null);
         $this->tunnel->start();
 
         // Check

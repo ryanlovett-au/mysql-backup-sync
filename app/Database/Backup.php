@@ -33,6 +33,9 @@ class Backup
     // Below this many rows an exact count is quick, above it we take the estimate and show a ~
     public const ESTIMATE_ABOVE = 10000;
 
+    // Only start estimating how long a table has left once it has been running this many seconds
+    public const ETA_AFTER = 60;
+
     // Tables tracking by updated_at with no index to support it, collected across the whole run
     public static array $missing_timestamp_indexes = [];
 
@@ -200,6 +203,42 @@ class Backup
         note('');
     }
 
+    /**
+     * How much longer this table looks like taking, based on the rate so far. Stays quiet for the
+     * first minute, since a short sync finishes before an estimate would be worth reading, and the
+     * rate over the first few batches is not yet a fair guide to the rest.
+     */
+    protected function eta(float $started, int $done, int $total): ?string
+    {
+        $elapsed = microtime(true) - $started;
+
+        if ($elapsed < self::ETA_AFTER || $done < 1 || $done >= $total) {
+            return null;
+        }
+
+        return 'About '.self::duration((int) round(($total - $done) * ($elapsed / $done))).' remaining';
+    }
+
+    protected static function duration(int $seconds): string
+    {
+        if ($seconds < 60) {
+            return $seconds.'s';
+        }
+
+        if ($seconds < 3600) {
+            return floor($seconds / 60).'m '.($seconds % 60).'s';
+        }
+
+        $hours = (int) floor($seconds / 3600);
+        $minutes = (int) floor(($seconds % 3600) / 60);
+
+        if ($hours < 24) {
+            return $hours.'h '.$minutes.'m';
+        }
+
+        return floor($hours / 24).'d '.($hours % 24).'h';
+    }
+
     public function update(): void
     {
         // Determine how to manage state
@@ -318,6 +357,8 @@ class Backup
             $progress = progress(label: ($this->table->always_resync ? 'Resyncing' : 'Updating').' '.$this->table->table_name.($estimated ? ' ~' : ''), steps: $count);
             $progress->start();
 
+            $started = microtime(true);
+
             $select_count = (int) Config::get('select_count');
             $update_count = (int) Config::get('update_count');
 
@@ -325,7 +366,7 @@ class Backup
             $columns = DBSchema::connection($this->local_db)
                 ->getColumnListing($this->table->table_name);
 
-            $write = function ($rows) use ($progress, $primary_key, $timestamps, $update_count, $columns) {
+            $write = function ($rows) use ($progress, $primary_key, $timestamps, $update_count, $columns, $started, $count) {
 
                 foreach ($rows->chunk($update_count) as $fewerows) {
                     // Cast rows to arrays
@@ -343,6 +384,11 @@ class Backup
                     $this->state->last_updated_at = $timestamps ? $last['updated_at'] : null;
                     $this->state->last_id = $last[$primary_key] ?? null;
                     $this->state->save();
+
+                    // Set before advancing, that is what draws it
+                    if ($eta = $this->eta($started, $progress->progress + count($fewerows), $count)) {
+                        $progress->hint($eta);
+                    }
 
                     $progress->advance(count($fewerows));
                 }

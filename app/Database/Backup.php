@@ -39,6 +39,14 @@ class Backup
     // Errors that mean the statement was too big, rather than anything being wrong with it
     public const TOO_LARGE = [1390, 1153];
 
+    // Rows cost several times their stored size once PHP holds them as objects. Measured at four to
+    // six times for typical mixed columns, so this errs high - the failure it guards is a hard one.
+    public const MEMORY_OVERHEAD = 6;
+
+    protected $status = null;
+
+    protected bool $status_loaded = false;
+
     // Say nothing about time remaining for the first twenty seconds, then wait for a few batches so
     // the rate has settled - but never stay quiet past ETA_BY, however slow the batches are
     public const ETA_AFTER = 20;
@@ -136,20 +144,57 @@ class Backup
     }
 
     /**
-     * The source server's own estimate of the table size. Free to ask for, but only a guess - InnoDB
-     * can be out by half, and reports 0 for a table it has no statistics for yet.
+     * What the source server says about this table. Only ever asked once, and only a guess - InnoDB
+     * keeps these figures as statistics rather than counting anything.
      */
-    protected function estimated_rows(): ?int
+    protected function table_status(): ?object
     {
-        try {
-            $status = DB::connection($this->remote_db)
-                ->selectOne('SHOW TABLE STATUS WHERE Name = ?', [$this->table->table_name]);
-        } catch (\Throwable $e) {
-            // Not every server will hand this over, counting still works
-            return null;
+        if (! $this->status_loaded) {
+            $this->status_loaded = true;
+
+            try {
+                $this->status = DB::connection($this->remote_db)
+                    ->selectOne('SHOW TABLE STATUS WHERE Name = ?', [$this->table->table_name]);
+            } catch (\Throwable $e) {
+                // Not every server will hand this over, counting still works
+                $this->status = null;
+            }
         }
 
+        return $this->status;
+    }
+
+    protected function estimated_rows(): ?int
+    {
+        $status = $this->table_status();
+
         return isset($status->Rows) ? (int) $status->Rows : null;
+    }
+
+    protected function average_row_length(): ?int
+    {
+        $status = $this->table_status();
+
+        return isset($status->Avg_row_length) ? (int) $status->Avg_row_length : null;
+    }
+
+    /**
+     * How many rows to pull from the source at once. Nothing caps this the way placeholders cap a
+     * write, but the whole batch is held in memory as objects, which costs several times what the
+     * rows measure on disk. Going over does not raise an error we can catch - it kills the run - so
+     * this stays well inside what we have.
+     */
+    protected function select_size(): int
+    {
+        $configured = max(1, (int) Config::get('select_count'));
+
+        $row_length = $this->average_row_length();
+
+        if (is_null($row_length) || $row_length < 1) {
+            return $configured;
+        }
+
+        return max(1, min($configured, intdiv(Memory::budget(), $row_length * self::MEMORY_OVERHEAD)));
     }
 
     /**
@@ -394,7 +439,7 @@ class Backup
 
             $started = microtime(true);
 
-            $select_count = max(1, (int) Config::get('select_count'));
+            $select_count = $this->select_size();
 
             // The destination structure cannot change mid-run, so only look the columns up once
             $columns = DBSchema::connection($this->local_db)

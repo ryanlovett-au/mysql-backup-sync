@@ -25,6 +25,12 @@ class Action
         // Start with a clean set of warnings, the menu can run this more than once per session
         Backup::$missing_timestamp_indexes = [];
 
+        // Batches are held in memory in full, so take a decent share of the host before we start
+        if ($raised = Memory::raise()) {
+            note('');
+            info('Memory limit raised to '.$raised);
+        }
+
         // Process each host in turn
         foreach ($hosts as $host) {
             // Allow for specifying specific hosts

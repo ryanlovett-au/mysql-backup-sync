@@ -204,27 +204,41 @@ class Backup
     {
         // Determine how to manage state
         $timestamps = $this->has_timestamps();
-        $primary_key = $this->get_primary_key();
+        $key_columns = $this->get_primary_key_columns();
+
+        // The first key column identifies the table well enough to order and hold state by, but only
+        // a single column key is unique on its own, which is what seeking from a cursor requires
+        $primary_key = $key_columns[0] ?? null;
+        $unique_key = count($key_columns) === 1 ? $key_columns[0] : null;
 
         // Determine which query type to use
         if ($this->table->always_resync || $primary_key == null) {
             $strategy = 'resync';
         } elseif ($timestamps && ! $this->table->always_primary_key) {
             $strategy = 'timestamps';
-        } else {
+        } elseif ($unique_key !== null) {
             $strategy = 'primary_key';
+        } else {
+            // Asked to track by primary key, but a composite key gives us nothing safe to seek from -
+            // seeking on part of it silently drops every row that shares that leading value
+            warning('Table '.$this->table->table_name.' has a composite primary key and no updated_at to track, resyncing it in full instead.');
+
+            $strategy = 'resync';
         }
 
         // Build the source query for the chosen strategy. The keyset strategies return a closure
         // because they are re-built for every batch, reading the cursor out of state as it advances.
         if ($strategy === 'resync') {
-            $query = function () use ($primary_key) {
+            $query = function () use ($key_columns) {
                 $query = DB::connection($this->remote_db)
                     ->table($this->table->table_name);
 
-                // Order by the primary key or by the first column if no primary key
-                if (! empty($primary_key)) {
-                    $query->orderBy($primary_key);
+                // Order by the whole primary key, or by the first column if there is no primary key.
+                // Paging by offset needs a total order or rows can shuffle between batches.
+                if (! empty($key_columns)) {
+                    foreach ($key_columns as $column) {
+                        $query->orderBy($column);
+                    }
                 } else {
                     $query->orderBy(
                         DBSchema::connection($this->remote_db)
@@ -252,16 +266,16 @@ class Backup
             $query = fn () => DB::connection($this->remote_db)
                 ->table($this->table->table_name)
                 ->where('updated_at', '>=', $this->state->last_updated_at)
-                ->when(! is_null($this->state->last_id), fn ($query) => $query->where(
+                ->when(! is_null($unique_key) && ! is_null($this->state->last_id), fn ($query) => $query->where(
                     fn ($query) => $query
                         ->where('updated_at', '>', $this->state->last_updated_at)
                         ->orWhere(fn ($query) => $query
                             ->where('updated_at', '=', $this->state->last_updated_at)
-                            ->where($primary_key, '>', $this->state->last_id)
+                            ->where($unique_key, '>', $this->state->last_id)
                         )
                 ))
                 ->orderBy('updated_at', 'asc')
-                ->orderBy($primary_key, 'asc');
+                ->when(! is_null($unique_key), fn ($query) => $query->orderBy($unique_key, 'asc'));
 
             $counter = fn () => $query()->count();
         } else {
@@ -271,8 +285,8 @@ class Backup
 
             $query = fn () => DB::connection($this->remote_db)
                 ->table($this->table->table_name)
-                ->where($primary_key, '>', $this->state->last_id)
-                ->orderBy($primary_key, 'asc');
+                ->where($unique_key, '>', $this->state->last_id)
+                ->orderBy($unique_key, 'asc');
 
             $counter = fn () => $query()->count();
         }
@@ -285,7 +299,7 @@ class Backup
             'timestamps' => $this->state->last_updated_at === self::EPOCH && is_null($this->state->last_id)
                 ? $this->estimated_rows()
                 : null,
-            default => $this->estimated_rows_above($primary_key, $this->state->last_id),
+            default => $this->estimated_rows_above($unique_key, $this->state->last_id),
         };
 
         // Only ever trust an estimate that is confidently large. Below the threshold a count is quick
@@ -334,8 +348,9 @@ class Backup
                 }
             };
 
-            // Get the data
-            if ($strategy === 'resync') {
+            // Get the data. Without a unique key there is no cursor to seek from, so those tables keep
+            // paging by offset - building the query once so the batches page a fixed result set.
+            if ($strategy === 'resync' || is_null($unique_key)) {
                 $query()->chunk($select_count, $write);
             } else {
                 $this->chunk_by_cursor($query, $select_count, $write);
@@ -380,17 +395,17 @@ class Backup
         $this->update();
     }
 
-    protected function get_primary_key(): ?string
+    /**
+     * Every column of the primary key, in key order. A composite key returns more than one, and a
+     * table without a primary key returns none.
+     */
+    protected function get_primary_key_columns(): array
     {
         $indexes = DBSchema::connection($this->local_db)->getIndexes($this->table->table_name);
 
-        $indexes = collect($indexes)->where('primary', true);
+        $primary = collect($indexes)->firstWhere('primary', true);
 
-        if ($indexes->count() === 1) {
-            return $indexes->first()['columns'][0];
-        }
-
-        return null;
+        return $primary['columns'] ?? [];
     }
 
     protected function get_last_id(): ?int

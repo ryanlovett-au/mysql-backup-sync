@@ -2,11 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Database\Action;
 use Illuminate\Console\Command;
 
 use function Laravel\Prompts\note;
-
-use App\Database\Action;
 
 class Database_Backup extends Command
 {
@@ -24,7 +23,7 @@ class Database_Backup extends Command
 
     public function handle(): void
     {
-        if ( !is_null($this->option('database')) && is_null($this->option('host')) ) {
+        if (! is_null($this->option('database')) && is_null($this->option('host'))) {
             note('If specifying a database, you must also specify a host');
             exit;
         }

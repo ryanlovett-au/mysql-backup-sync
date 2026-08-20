@@ -2,33 +2,34 @@
 
 namespace App\Database;
 
-use Illuminate\Console\Command;
+use App\Models\Config;
+use App\Models\State;
+use App\Models\Table;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DBSchema;
 
 use function Laravel\Prompts\error;
-use function Laravel\Prompts\note;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\progress;
-
-use App\Models\Table;
-use App\Models\State;
-use App\Models\Config;
 
 class Schema
 {
     public string $local_db = '';
+
     public string $remote_db = '';
 
     public array $config_tables = [];
 
     public array $create_local = [];
+
     public array $remove_local = [];
+
     public array $check_local = [];
 
     public array $tables_list = [];
 
     public int $host_id;
+
     public int $database_id;
 
     public function __construct($database, $local)
@@ -65,13 +66,15 @@ class Schema
         sort($remote);
         $this->tables_list = $remote;
 
-        $progress->finish(); echo "\n";
+        $progress->finish();
+        echo "\n";
     }
 
     public function get_tables($connection): array
     {
         // Get the full list of tables from the connection
         $tables = DBSchema::connection($connection)->getTables(schema: config('database.connections.'.$connection.'.database'));
+
         return collect($tables)->pluck('name')->toArray();
     }
 
@@ -84,15 +87,21 @@ class Schema
 
         // Add those tables
         foreach ($tables as $table) {
-            if (!Table::where('database_id', $this->database_id)->where('table_name', $table)->first()) {
-                $create = new Table();
+            if (! Table::where('database_id', $this->database_id)->where('table_name', $table)->first()) {
+                $create = new Table;
                 $create->database_id = $this->database_id;
                 $create->table_name = $table;
 
                 // Apply global config
-                if (in_array($table, $always_resync)) { $create->always_resync = 1; }
-                if (in_array($table, $always_inactive)) { $create->is_active = 0; }
-                if (in_array($table, $always_primary)) { $create->always_primary_key = 1; }
+                if (in_array($table, $always_resync)) {
+                    $create->always_resync = 1;
+                }
+                if (in_array($table, $always_inactive)) {
+                    $create->is_active = 0;
+                }
+                if (in_array($table, $always_primary)) {
+                    $create->always_primary_key = 1;
+                }
 
                 $create->save();
             }
@@ -111,7 +120,7 @@ class Schema
             // Get table structures
             $remote = DB::connection($this->remote_db)->selectOne('SHOW CREATE TABLE '.$table)->{'Create Table'};
             $local = DB::connection($this->local_db)->selectOne('SHOW CREATE TABLE '.$table)->{'Create Table'};
-            
+
             // Drop variable elements from the statement
             $remote = $this->cleanup_create($remote);
             $local = $this->cleanup_create($local);
@@ -123,7 +132,8 @@ class Schema
             $progress->advance();
         }
 
-        $progress->finish(); echo "\n";
+        $progress->finish();
+        echo "\n";
 
         if (count($reset_tables) > 0) {
             error('Table structure has changed (resync required):');
@@ -133,7 +143,7 @@ class Schema
 
             echo "\n";
         }
-        
+
         return $reset_tables;
     }
 
@@ -153,11 +163,11 @@ class Schema
     public function create_local()
     {
         info('Creating tables:');
-        
+
         foreach ($this->create_local as $reset) {
             info(' - '.$reset);
         }
-        
+
         echo "\n";
 
         $progress = progress(label: 'Creating new tables', steps: count($this->create_local));
@@ -171,8 +181,8 @@ class Schema
             DB::connection($this->local_db)->statement($create->{'Create Table'});
 
             // Add to tables table, if not already present
-            if (!Table::where('database_id', $this->database_id)->where('table_name', $table)->first()) {
-                $create = new Table();
+            if (! Table::where('database_id', $this->database_id)->where('table_name', $table)->first()) {
+                $create = new Table;
                 $create->database_id = $this->database_id;
                 $create->table_name = $table;
                 $create->save();
@@ -181,7 +191,8 @@ class Schema
             $progress->advance();
         }
 
-        $progress->finish(); echo "\n";
+        $progress->finish();
+        echo "\n";
     }
 
     public function remove_local()
@@ -191,7 +202,7 @@ class Schema
         foreach ($this->remove_local as $reset) {
             error(' - '.$reset);
         }
-        
+
         echo "\n";
 
         $progress = progress(label: 'Dropping removed tables', steps: count($this->remove_local));
@@ -210,12 +221,9 @@ class Schema
             $progress->advance();
         }
 
-        $progress->finish(); echo "\n";
+        $progress->finish();
+        echo "\n";
     }
 
-    public function get_views()
-    {
-
-    }
-
+    public function get_views() {}
 }

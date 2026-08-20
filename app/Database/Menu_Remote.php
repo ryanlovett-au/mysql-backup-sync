@@ -2,34 +2,29 @@
 
 namespace App\Database;
 
+use App\Models\Database;
+use App\Models\Host;
+use App\Models\State;
+use App\Models\Table;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DBSchema;
 
-use function Laravel\Prompts\clear;
-use function Laravel\Prompts\note;
-use function Laravel\Prompts\info;
 use function Laravel\Prompts\alert;
-use function Laravel\Prompts\progress;
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\info;
 use function Laravel\Prompts\pause;
 use function Laravel\Prompts\select;
-use function Laravel\Prompts\text;
-use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\spin;
-
-use App\Models\Config;
-use App\Models\Host;
-use App\Models\Database;
-use App\Models\Table;
-use App\Models\State;
+use function Laravel\Prompts\text;
 
 class Menu_Remote
 {
     public static function remote_config_host($host): void
     {
-    	Menu::header();
+        Menu::header();
 
         if ($host == 'new') {
-            $host = new Host();
+            $host = new Host;
             $host->db_host = '';
             $host->db_port = '3306';
             $host->db_username = '';
@@ -38,7 +33,7 @@ class Menu_Remote
             $host = Host::find($host);
         }
 
-    	$next = select(
+        $next = select(
             label: 'Configure Source (Original) Host/Database - '.($host->ssh_host ? $host->ssh_host.' ('.$host->db_host.')' : $host->db_host),
             options: self::remote_config_host_options($host),
             scroll: 25,
@@ -46,17 +41,17 @@ class Menu_Remote
         );
 
         switch ($next) {
-        	case '-':
+            case '-':
             case '--':
             case '---':
                 self::remote_config_host($host->id ?? 'new');
                 break;
 
             case 'test':
-                (new Connect())->test($host);
+                (new Connect)->test($host);
                 break;
 
-            case 'delete';
+            case 'delete':
                 $deleted = self::delete_host($host);
 
             case 'back':
@@ -76,13 +71,13 @@ class Menu_Remote
         }
 
         self::remote_config_host($host->id ?? 'new');
-	}
+    }
 
-	private static function remote_config_host_options($host): array
+    private static function remote_config_host_options($host): array
     {
         $columns = array_diff(DBSchema::getColumnListing('hosts'), ['id', 'created_at', 'updated_at', 'db_use_ssl', 'ssh_private_key_passphrase', 'ssh_public_key_path']);
 
-        $len = collect($columns)->map(fn ($column) => is_string($column) ? strlen($column) : 0 )->max();
+        $len = collect($columns)->map(fn ($column) => is_string($column) ? strlen($column) : 0)->max();
 
         $options = [];
 
@@ -114,15 +109,17 @@ class Menu_Remote
         if ($host->databases->count() > 0) {
             alert('You cannot delete a host with configured databases.');
             pause();
+
             return false;
         }
 
         alert('You are about to delete the record for host: '.($host->ssh_host ? $host->ssh_host.' ('.$host->db_host.')' : $host->db_host).'.');
 
-        $confirmed = confirm(label: 'Are you sure?', default: false,);
+        $confirmed = confirm(label: 'Are you sure?', default: false);
 
         if ($confirmed) {
             $host->delete();
+
             return true;
         }
 
@@ -137,8 +134,11 @@ class Menu_Remote
             hint: 'For NULL enter an empty string...'
         );
 
-        if ($update == 'false' || $update == 'no') { $update = '0'; }
-        else if ($update == 'true' || $update == 'yes') { $update = '1'; }
+        if ($update == 'false' || $update == 'no') {
+            $update = '0';
+        } elseif ($update == 'true' || $update == 'yes') {
+            $update = '1';
+        }
 
         $host->{$column} = $update;
 
@@ -152,7 +152,7 @@ class Menu_Remote
         Menu::header();
 
         if ($database == 'database_new') {
-            $database = new Database();
+            $database = new Database;
             $database->host_id = $host->id;
             $database->database_name = '';
         } else {
@@ -173,7 +173,7 @@ class Menu_Remote
                 self::remote_config_database($database->id ?? 'new', $host);
                 break;
 
-            case 'delete';
+            case 'delete':
                 $deleted = self::delete_database($database, $host);
 
             case 'back':
@@ -199,7 +199,7 @@ class Menu_Remote
     {
         $columns = array_diff(DBSchema::getColumnListing('databases'), ['id', 'host_id', 'all_tables', 'created_at', 'updated_at']);
 
-        $len = collect($columns)->map(fn ($column) => is_string($column) ? strlen($column) : 0 )->max();
+        $len = collect($columns)->map(fn ($column) => is_string($column) ? strlen($column) : 0)->max();
 
         $options = [];
 
@@ -214,7 +214,7 @@ class Menu_Remote
 
             foreach ($database->alltables as $table) {
                 $options['table_'.$table->id] = $table->table_name;
-                $options['table_'.$table->id] .= !$table->is_active ? ' (inactive)' : '';
+                $options['table_'.$table->id] .= ! $table->is_active ? ' (inactive)' : '';
                 $options['table_'.$table->id] .= $table->always_resync ? ' (resync)' : '';
                 $options['table_'.$table->id] .= $table->always_primary_key ? ' (primary key)' : '';
             }
@@ -235,24 +235,26 @@ class Menu_Remote
             hint: 'For NULL enter an empty string...'
         );
 
-        if ($update == 'false' || $update == 'no') { $update = '0'; }
-        else if ($update == 'true' || $update == 'yes') { $update = '1'; }
+        if ($update == 'false' || $update == 'no') {
+            $update = '0';
+        } elseif ($update == 'true' || $update == 'yes') {
+            $update = '1';
+        }
 
         $database->{$column} = $update;
 
         $database->save();
 
         // Check if we want to update tables listing
-        if (Table::where('database_id', $database->id)->count() < 1) 
-        {    
+        if (Table::where('database_id', $database->id)->count() < 1) {
             info('Updating menu with table details...');
 
-            $connect = new Connect();
+            $connect = new Connect;
 
             if ($host->use_ssh_tunnel) {
                 spin(message: 'Opening SSH tunnel', callback: fn () => $connect->connect_tunnel($host));
             }
-            
+
             $connect->setup_remote_db($host, $database, false);
 
             spin(message: 'Populating menu with table information...', callback: function () use ($database, $connect) {
@@ -276,12 +278,11 @@ class Menu_Remote
 
         alert('This will delete all associated backed up (destination) data!');
 
-        $confirmed = confirm(label: 'Are you sure?', default: false,);
+        $confirmed = confirm(label: 'Are you sure?', default: false);
 
-        if ($confirmed) 
-        {
+        if ($confirmed) {
             // Delete local data
-            $connect = new Connect();
+            $connect = new Connect;
             $connect->setup_local_db($host, $database);
 
             $len = 55 - iconv_strlen($database->database_name);
@@ -314,11 +315,11 @@ class Menu_Remote
             label: 'Configure Table '.$table->table_name.' for '.$database->database_name,
             options: [
                 '-' => '-------------------- Config ----------------------',
-                'always_resync'      => 'ALWAYS RESYNC          = '.$table->always_resync,
+                'always_resync' => 'ALWAYS RESYNC          = '.$table->always_resync,
                 'always_primary_key' => 'ALWAYS USE PRIMARY KEY = '.$table->always_primary_key,
-                'is_active'          => 'IS ACTIVE              = '.$table->is_active,
+                'is_active' => 'IS ACTIVE              = '.$table->is_active,
                 '--' => '--------------------------------------------------',
-                'back' => 'Back'
+                'back' => 'Back',
             ],
             scroll: 10,
             required: true
@@ -349,8 +350,11 @@ class Menu_Remote
             hint: 'For NULL enter an empty string...'
         );
 
-        if ($update == 'false' || $update == 'no') { $update = '0'; }
-        else if ($update == 'true' || $update == 'yes') { $update = '1'; }
+        if ($update == 'false' || $update == 'no') {
+            $update = '0';
+        } elseif ($update == 'true' || $update == 'yes') {
+            $update = '1';
+        }
 
         $table->{$column} = $update;
 

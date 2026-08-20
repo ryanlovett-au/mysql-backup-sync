@@ -10,6 +10,6 @@ class Config extends Model
 
     public static function get($key)
     {
-    	return Config::where('key', $key)->first()?->value;
+        return Config::where('key', $key)->first()?->value;
     }
 }

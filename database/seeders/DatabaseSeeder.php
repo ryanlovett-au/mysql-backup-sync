@@ -2,11 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
-use Illuminate\Support\Facades\DB;
-
 use App\Models\Config;
+use Illuminate\Database\Seeder;
 
 class DatabaseSeeder extends Seeder
 {
@@ -35,5 +32,5 @@ class DatabaseSeeder extends Seeder
 
         // Added around 0.5
         Config::firstOrCreate(['key' => 'keep_db_names'], ['key' => 'keep_db_names', 'field_type' => 'text', 'value' => null]);
-    } 
+    }
 }

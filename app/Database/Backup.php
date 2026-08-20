@@ -2,26 +2,28 @@
 
 namespace App\Database;
 
-use Illuminate\Console\Command;
+use App\Models\Config;
+use App\Models\State;
+use App\Models\Table;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema as DBSchema;
 
 use function Laravel\Prompts\alert;
 use function Laravel\Prompts\note;
-use function Laravel\Prompts\progress;
 use function Laravel\Prompts\pause;
+use function Laravel\Prompts\progress;
 use function Laravel\Prompts\warning;
-
-use App\Models\Config;
-use App\Models\Table;
-use App\Models\State;
 
 class Backup
 {
     public string $local_db = '';
+
     public string $remote_db = '';
+
     public string $database_name = '';
+
     public $table = null;
+
     public $state = null;
 
     // Tables tracking by updated_at with no index to support it, collected across the whole run
@@ -37,8 +39,8 @@ class Backup
             ->where('table_name', $table)
             ->first();
 
-        if (!$this->table) {
-            $create = new Table();
+        if (! $this->table) {
+            $create = new Table;
             $create->database_id = $database->id;
             $create->table_name = $table;
             $create->save();
@@ -60,27 +62,28 @@ class Backup
 
     public function action($cli = false)
     {
-        if (!$this->table) {
+        if (! $this->table) {
             alert('Table config not found, consider re-sycning tables.');
-            
-            if (!$cli) {
+
+            if (! $cli) {
                 pause();
             }
-            
+
             return;
         }
 
-        if (!$this->table->is_active) {
+        if (! $this->table->is_active) {
             return;
         }
 
-        if (($this->state->last_id || $this->state->last_updated_id) && !$this->table->always_resync) {
+        if (($this->state->last_id || $this->state->last_updated_id) && ! $this->table->always_resync) {
             $this->update();
+
             return;
         }
 
         $this->resync();
-        return;
+
     }
 
     public function has_timestamps(): bool
@@ -104,7 +107,7 @@ class Backup
 
         $table = $this->database_name.'.'.$this->table->table_name;
 
-        if (!in_array($table, self::$missing_timestamp_indexes)) {
+        if (! in_array($table, self::$missing_timestamp_indexes)) {
             self::$missing_timestamp_indexes[] = $table;
         }
 
@@ -141,7 +144,7 @@ class Backup
         // Determine which query type to use
         if ($this->table->always_resync || $primary_key == null) {
             $strategy = 'resync';
-        } else if ($timestamps && !$this->table->always_primary_key) {
+        } elseif ($timestamps && ! $this->table->always_primary_key) {
             $strategy = 'timestamps';
         } else {
             $strategy = 'primary_key';
@@ -155,7 +158,7 @@ class Backup
                     ->table($this->table->table_name);
 
                 // Order by the primary key or by the first column if no primary key
-                if (!empty($primary_key)) {
+                if (! empty($primary_key)) {
                     $query->orderBy($primary_key);
                 } else {
                     $query->orderBy(
@@ -171,9 +174,7 @@ class Backup
             $count = DB::connection($this->remote_db)
                 ->table($this->table->table_name)
                 ->count();
-        }
-
-        else if ($strategy === 'timestamps') {
+        } elseif ($strategy === 'timestamps') {
             if (empty($this->state->last_updated_at)) {
                 $this->state->last_updated_at = '1900-01-01 00:00:01';
             }
@@ -186,7 +187,7 @@ class Backup
             $query = fn () => DB::connection($this->remote_db)
                 ->table($this->table->table_name)
                 ->where('updated_at', '>=', $this->state->last_updated_at)
-                ->when(!is_null($this->state->last_id), fn ($query) => $query->where(
+                ->when(! is_null($this->state->last_id), fn ($query) => $query->where(
                     fn ($query) => $query
                         ->where('updated_at', '>', $this->state->last_updated_at)
                         ->orWhere(fn ($query) => $query
@@ -198,9 +199,7 @@ class Backup
                 ->orderBy($primary_key, 'asc');
 
             $count = $query()->count();
-        }
-
-        else {
+        } else {
             if (empty($this->state->last_id)) {
                 $this->state->last_id = 0;
             }
@@ -227,8 +226,7 @@ class Backup
 
             $write = function ($rows) use ($progress, $primary_key, $timestamps, $update_count, $columns) {
 
-                foreach ($rows->chunk($update_count) as $fewerows)
-                {
+                foreach ($rows->chunk($update_count) as $fewerows) {
                     // Cast rows to arrays
                     $fewerows = array_map(function ($row) {
                         return (array) $row;
@@ -256,7 +254,8 @@ class Backup
                 $this->chunk_by_cursor($query, $select_count, $write);
             }
 
-            $progress->finish(); echo "\n";
+            $progress->finish();
+            echo "\n";
         }
     }
 
@@ -294,7 +293,7 @@ class Backup
         $this->update();
     }
 
-    protected function get_primary_key(): string|null
+    protected function get_primary_key(): ?string
     {
         $indexes = DBSchema::connection($this->local_db)->getIndexes($this->table->table_name);
 
@@ -307,12 +306,12 @@ class Backup
         return null;
     }
 
-    protected function get_last_id(): int|null
+    protected function get_last_id(): ?int
     {
         return DB::connection($this->local_db)->table($this->table->table_name)->orderBy('id', 'desc')->first()?->id;
     }
 
-    protected function get_last_update_at(): string|null
+    protected function get_last_update_at(): ?string
     {
         if ($this->has_timestamps()) {
             return DB::connection($this->local_db)->table($this->table->table_name)->orderBy('updated_at', 'desc')->first()?->updated_at;

@@ -2,27 +2,28 @@
 
 namespace App\Database;
 
+use App\Models\Config;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Config as AppConfig;
 use Illuminate\Support\Facades\DB;
 use Symfony\Component\Process\Process;
 
-use function Laravel\Prompts\note;
 use function Laravel\Prompts\alert;
-use function Laravel\Prompts\progress;
-use function Laravel\Prompts\spin;
-use function Laravel\Prompts\pause;
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
-
-use App\Models\Config;
-use App\Models\Host;
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\pause;
+use function Laravel\Prompts\progress;
+use function Laravel\Prompts\spin;
 
 class Connect
 {
     public $tunnel = null;
+
     public $remote_db = null;
+
     public $local_db = null;
+
     public $local_port = '6448';
 
     public function connect_tunnel($host): void
@@ -34,13 +35,13 @@ class Connect
         $command = ['ssh', '-C', '-N', '-L', $this->local_port.':'.$host->db_host.':'.$host->db_port, $host->ssh_username.'@'.$host->ssh_host, '-p', $host->ssh_port];
 
         // Authenticate
-        if (!empty($host->ssh_private_key_path)) {
+        if (! empty($host->ssh_private_key_path)) {
             $command = array_merge($command, ['-i', $host->ssh_private_key_path]);
 
             // if (!empty($host->ssh_private_key_passphrase)) {
             //     $command = $command + ['-o', 'IdentityFile='.$host->ssh_private_key_passphrase]; // May be needed for passphrase
             // }
-        } else if (!empty($host->ssh_password)) {
+        } elseif (! empty($host->ssh_password)) {
             $command = array_merge(['sshpass', '-p', $host->ssh_password], $command);
         }
 
@@ -50,7 +51,7 @@ class Connect
 
         // Check
         $i = 10;
-        while (!$this->check_tunnel() && $i > 0) {
+        while (! $this->check_tunnel() && $i > 0) {
             sleep(1);
             $i--;
         }
@@ -63,12 +64,13 @@ class Connect
         $port = rand(6448, 9999);
 
         $check = @fsockopen('127.0.0.1', $port, $errno, $errstr, 0.1);
-        
+
         if (is_resource($check)) {
             fclose($check);
+
             return $this->get_tunnel_port();
         }
-        
+
         return $port;
     }
 
@@ -78,6 +80,7 @@ class Connect
 
         if (is_resource($connection)) {
             fclose($connection);
+
             return true;
         }
 
@@ -87,7 +90,7 @@ class Connect
     public function disconnect_tunnel(): void
     {
         if (is_numeric($this->tunnel->getPid())) {
-            exec("kill " . escapeshellarg($this->tunnel->getPid()), $output, $code);
+            exec('kill '.escapeshellarg($this->tunnel->getPid()), $output, $code);
             $this->tunnel = null;
         }
 
@@ -100,7 +103,7 @@ class Connect
         $progress->start();
 
         // Disconnect previous connections and reset config
-        if (!empty($this->remote_db)) {
+        if (! empty($this->remote_db)) {
             DB::purge($this->remote_db);
             $this->remote_db = null;
         }
@@ -128,7 +131,8 @@ class Connect
 
         AppConfig::set('database.connections.'.$this->remote_db, $connect);
 
-        $progress->finish(); echo "\n";
+        $progress->finish();
+        echo "\n";
     }
 
     public function setup_local_db($host, $database, $create = true): void
@@ -137,7 +141,7 @@ class Connect
         $progress->start();
 
         // Disconnect previous connections and reset config
-        if (!empty($this->local_db)) {
+        if (! empty($this->local_db)) {
             DB::purge($this->local_db);
             $this->local_db = null;
         }
@@ -198,13 +202,14 @@ class Connect
                     alert('Error: Destination database does not exist and not able to be created.');
 
                     $this->disconnect_tunnel();
-                    
+
                     exit(1);
                 }
             }
         }
 
-        $progress->finish(); echo "\n";
+        $progress->finish();
+        echo "\n";
     }
 
     public function check_tz()
@@ -275,6 +280,5 @@ class Connect
 
         pause();
 
-        return;
     }
 }

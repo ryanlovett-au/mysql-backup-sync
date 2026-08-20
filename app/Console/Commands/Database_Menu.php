@@ -2,9 +2,8 @@
 
 namespace App\Console\Commands;
 
-use Illuminate\Console\Command;
-
 use App\Database\Menu;
+use Illuminate\Console\Command;
 
 class Database_Menu extends Command
 {

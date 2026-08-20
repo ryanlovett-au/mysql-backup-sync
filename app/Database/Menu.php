@@ -2,33 +2,28 @@
 
 namespace App\Database;
 
-use function Laravel\Prompts\clear;
-use function Laravel\Prompts\note;
-use function Laravel\Prompts\info;
-use function Laravel\Prompts\alert;
-use function Laravel\Prompts\progress;
-use function Laravel\Prompts\select;
-
-use App\Models\Config;
 use App\Models\Host;
-use App\Models\Database;
-use App\Models\Table;
+
+use function Laravel\Prompts\clear;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\select;
 
 class Menu
 {
     public static function header(): void
     {
-    	clear();
+        clear();
         note('');
-    	info('*** MySQL DB Backup/Sync ***');
-    	note(' https://github.com/ryanlovett-au');
+        info('*** MySQL DB Backup/Sync ***');
+        note(' https://github.com/ryanlovett-au');
     }
 
     public static function home(): void
     {
-    	self::header();
+        self::header();
 
-    	$next = select(
+        $next = select(
             label: 'Main Menu',
             options: self::home_options(),
             scroll: 20,
@@ -36,13 +31,13 @@ class Menu
         );
 
         switch ($next) {
-        	case 'backup':
-        		Action::go();
-        		break;
+            case 'backup':
+                Action::go();
+                break;
 
-        	case 'config':
-        		self::config();
-        		break;
+            case 'config':
+                self::config();
+                break;
 
             case 'exit':
                 info('Ok, bye...');
@@ -50,9 +45,9 @@ class Menu
         }
 
         self::home();
-	}
+    }
 
-	private static function home_options(): array
+    private static function home_options(): array
     {
         $options = [];
 
@@ -65,9 +60,9 @@ class Menu
 
     public static function config(): void
     {
-    	self::header();
+        self::header();
 
-    	$next = select(
+        $next = select(
             label: 'Configuration',
             options: self::config_options(),
             scroll: 10,
@@ -75,14 +70,14 @@ class Menu
         );
 
         switch ($next) {
-        	case 'local':
-        		Menu_Local::local_config();
-        		break;
+            case 'local':
+                Menu_Local::local_config();
+                break;
 
-        	case 'add':
-        	case 'add2':
-        		Menu_Remote::remote_config_host('new');
-        		break;
+            case 'add':
+            case 'add2':
+                Menu_Remote::remote_config_host('new');
+                break;
 
             case '-':
             case '--':
@@ -94,11 +89,11 @@ class Menu
                 break;
 
             default:
-            	Menu_Remote::remote_config_host($next);
+                Menu_Remote::remote_config_host($next);
         }
 
         self::config();
-	}
+    }
 
     private static function config_options(): array
     {
@@ -109,11 +104,11 @@ class Menu
         $options['add'] = 'Add Source Host/Database';
 
         if ($hosts = Host::all()) {
-        	foreach ($hosts as $host) {
-        		$options[$host->id] = $host->ssh_host ? $host->ssh_host.' ('.$host->db_host.')' : $host->db_host;
-        	}
+            foreach ($hosts as $host) {
+                $options[$host->id] = $host->ssh_host ? $host->ssh_host.' ('.$host->db_host.')' : $host->db_host;
+            }
         } else {
-        	$options['add2'] = 'No Hosts Configured';
+            $options['add2'] = 'No Hosts Configured';
         }
 
         $options['--'] = '--------------------------------------------------';
@@ -121,5 +116,4 @@ class Menu
 
         return $options;
     }
-
 }

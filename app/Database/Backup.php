@@ -12,6 +12,7 @@ use function Laravel\Prompts\alert;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\pause;
 use function Laravel\Prompts\progress;
+use function Laravel\Prompts\spin;
 use function Laravel\Prompts\warning;
 
 class Backup
@@ -25,6 +26,12 @@ class Backup
     public $table = null;
 
     public $state = null;
+
+    // Where a table has never been synced, the updated_at we start from
+    public const EPOCH = '1900-01-01 00:00:01';
+
+    // Below this many rows an exact count is quick, above it we take the estimate and show a ~
+    public const ESTIMATE_ABOVE = 10000;
 
     // Tables tracking by updated_at with no index to support it, collected across the whole run
     public static array $missing_timestamp_indexes = [];
@@ -114,6 +121,64 @@ class Backup
         warning('No index on updated_at for '.$this->table->table_name.', every batch must scan and sort the whole table.');
     }
 
+    /**
+     * The source server's own estimate of the table size. Free to ask for, but only a guess - InnoDB
+     * can be out by half, and reports 0 for a table it has no statistics for yet.
+     */
+    protected function estimated_rows(): ?int
+    {
+        try {
+            $status = DB::connection($this->remote_db)
+                ->selectOne('SHOW TABLE STATUS WHERE Name = ?', [$this->table->table_name]);
+        } catch (\Throwable $e) {
+            // Not every server will hand this over, counting still works
+            return null;
+        }
+
+        return isset($status->Rows) ? (int) $status->Rows : null;
+    }
+
+    /**
+     * Estimate how much of the table is still to come, without counting it. MIN and MAX on an indexed
+     * column are endpoint lookups the optimiser answers from the index, so this costs nothing even on
+     * a table of hundreds of millions of rows. Assumes the key is reasonably evenly spread.
+     */
+    protected function estimated_rows_above(string $column, $value): ?int
+    {
+        $total = $this->estimated_rows();
+
+        if (is_null($total)) {
+            return null;
+        }
+
+        $grammar = DB::connection($this->remote_db)->getQueryGrammar();
+
+        try {
+            $bounds = DB::connection($this->remote_db)
+                ->table($this->table->table_name)
+                ->selectRaw('MIN('.$grammar->wrap($column).') as low, MAX('.$grammar->wrap($column).') as high')
+                ->first();
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        // Anything we cannot do arithmetic on (uuids, strings) is not something we can apportion
+        if (! isset($bounds->low, $bounds->high) || ! is_numeric($bounds->low) || ! is_numeric($bounds->high)) {
+            return null;
+        }
+
+        $span = $bounds->high - $bounds->low;
+
+        if ($span <= 0) {
+            return null;
+        }
+
+        // The cursor can sit past the top of the table if rows have since been removed at the source
+        $remaining = max(0, $bounds->high - max((float) $value, (float) $bounds->low));
+
+        return (int) round($total * ($remaining / $span));
+    }
+
     public static function report_missing_indexes(): void
     {
         if (count(self::$missing_timestamp_indexes) === 0) {
@@ -171,12 +236,12 @@ class Backup
                 return $query;
             };
 
-            $count = DB::connection($this->remote_db)
+            $counter = fn () => DB::connection($this->remote_db)
                 ->table($this->table->table_name)
                 ->count();
         } elseif ($strategy === 'timestamps') {
             if (empty($this->state->last_updated_at)) {
-                $this->state->last_updated_at = '1900-01-01 00:00:01';
+                $this->state->last_updated_at = self::EPOCH;
             }
 
             // This strategy leans on an index over updated_at, warn if there isn't one
@@ -198,7 +263,7 @@ class Backup
                 ->orderBy('updated_at', 'asc')
                 ->orderBy($primary_key, 'asc');
 
-            $count = $query()->count();
+            $counter = fn () => $query()->count();
         } else {
             if (empty($this->state->last_id)) {
                 $this->state->last_id = 0;
@@ -209,12 +274,34 @@ class Backup
                 ->where($primary_key, '>', $this->state->last_id)
                 ->orderBy($primary_key, 'asc');
 
-            $count = $query()->count();
+            $counter = fn () => $query()->count();
         }
+
+        // Work out the progress total. Counting is exact but on a very large table it is a scan we do
+        // not otherwise need, and on a resumed first sync we would pay it on every single run. Where
+        // the server's estimate says there is a lot still to come, take that instead and flag it.
+        $estimate = match ($strategy) {
+            'resync' => $this->estimated_rows(),
+            'timestamps' => $this->state->last_updated_at === self::EPOCH && is_null($this->state->last_id)
+                ? $this->estimated_rows()
+                : null,
+            default => $this->estimated_rows_above($primary_key, $this->state->last_id),
+        };
+
+        // Only ever trust an estimate that is confidently large. Below the threshold a count is quick
+        // anyway, and this is what keeps a bogus estimate of 0 from skipping the table entirely.
+        $estimated = ! is_null($estimate) && $estimate >= self::ESTIMATE_ABOVE;
+
+        // Counting a large table is slow enough to look like a hang, so say what we are waiting on.
+        // The spinner erases itself, leaving the progress bar in its place.
+        $count = $estimated ? $estimate : spin(
+            message: 'Counting rows in '.$this->table->table_name,
+            callback: $counter
+        );
 
         // Are we going??
         if ($count > 0) {
-            $progress = progress(label: ($this->table->always_resync ? 'Resyncing' : 'Updating').' '.$this->table->table_name, steps: $count);
+            $progress = progress(label: ($this->table->always_resync ? 'Resyncing' : 'Updating').' '.$this->table->table_name.($estimated ? ' ~' : ''), steps: $count);
             $progress->start();
 
             $select_count = (int) Config::get('select_count');

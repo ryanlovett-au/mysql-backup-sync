@@ -28,6 +28,9 @@ class Database_Backup extends Command
             exit;
         }
 
+        // Same as the menu does - a scheduled run needs its own database brought up to date too
+        $this->call('migrate', ['--quiet' => true, '--force' => true]);
+
         Action::go($this->options(), true, $this->option('host'), $this->option('database'));
     }
 }

@@ -215,6 +215,9 @@ class Schema
             // needs to go, so the rebuilt table resyncs from scratch.
             if (! in_array($table, $this->create_local)) {
                 Table::where('database_id', $this->database_id)->where('table_name', $table)->delete();
+            } else {
+                // The columns have changed, so any write size we learned for it no longer applies
+                Table::where('database_id', $this->database_id)->where('table_name', $table)->update(['write_size' => null]);
             }
 
             $progress->advance();

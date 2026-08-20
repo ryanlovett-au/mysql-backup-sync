@@ -33,6 +33,12 @@ class Backup
     // Below this many rows an exact count is quick, above it we take the estimate and show a ~
     public const ESTIMATE_ABOVE = 10000;
 
+    // MySQL will not take more than this many placeholders in one prepared statement
+    public const MAX_PLACEHOLDERS = 65535;
+
+    // Errors that mean the statement was too big, rather than anything being wrong with it
+    public const TOO_LARGE = [1390, 1153];
+
     // Say nothing about time remaining for the first twenty seconds, then wait for a few batches so
     // the rate has settled - but never stay quiet past ETA_BY, however slow the batches are
     public const ETA_AFTER = 20;
@@ -248,6 +254,26 @@ class Backup
         return floor($hours / 24).'d '.($hours % 24).'h';
     }
 
+    /**
+     * How many rows to put in one write. Every column of every row is a placeholder and MySQL will
+     * not take more than 65535 of them in a statement, so the real ceiling belongs to the table, not
+     * to a global setting that has to be low enough for the widest table in the database.
+     */
+    protected function write_size(array $columns): int
+    {
+        $limits = [
+            max(1, (int) Config::get('update_count')),
+            intdiv(self::MAX_PLACEHOLDERS, max(1, count($columns))),
+        ];
+
+        // A size this table has already been forced down to, so we do not fail our way back to it
+        if ($this->table->write_size > 0) {
+            $limits[] = (int) $this->table->write_size;
+        }
+
+        return max(1, min($limits));
+    }
+
     public function update(): void
     {
         // Determine how to manage state
@@ -368,27 +394,48 @@ class Backup
 
             $started = microtime(true);
 
-            $select_count = (int) Config::get('select_count');
-            $update_count = (int) Config::get('update_count');
+            $select_count = max(1, (int) Config::get('select_count'));
 
             // The destination structure cannot change mid-run, so only look the columns up once
             $columns = DBSchema::connection($this->local_db)
                 ->getColumnListing($this->table->table_name);
 
+            $write_size = $this->write_size($columns);
+
             $batches = 0;
 
-            $write = function ($rows) use ($progress, $primary_key, $timestamps, $update_count, $columns, $started, $count, &$batches) {
+            $write = function ($rows) use ($progress, $primary_key, $timestamps, $columns, $started, $count, &$batches, &$write_size) {
 
-                foreach ($rows->chunk($update_count) as $fewerows) {
+                $queue = $rows->all();
+
+                while (count($queue) > 0) {
                     // Cast rows to arrays
                     $fewerows = array_map(function ($row) {
                         return (array) $row;
-                    }, $fewerows->toArray());
+                    }, array_slice($queue, 0, $write_size));
 
                     // Insert
-                    DB::connection($this->local_db)
-                        ->table($this->table->table_name)
-                        ->upsert($fewerows, [], $columns);
+                    try {
+                        DB::connection($this->local_db)
+                            ->table($this->table->table_name)
+                            ->upsert($fewerows, [], $columns);
+                    } catch (\Throwable $e) {
+                        // The server can refuse a statement on size alone, going on the bytes in it
+                        // rather than the placeholder count we sized for. Halve and hold the smaller
+                        // size, for the rest of this table and for the next run.
+                        if (! in_array((int) Error::code($e), self::TOO_LARGE, true) || count($fewerows) < 2) {
+                            throw $e;
+                        }
+
+                        $write_size = max(1, intdiv($write_size, 2));
+
+                        $this->table->write_size = $write_size;
+                        $this->table->save();
+
+                        continue;
+                    }
+
+                    array_splice($queue, 0, count($fewerows));
 
                     // Update state as we go - only use primary key as that is how we are getting source rows
                     $last = end($fewerows);

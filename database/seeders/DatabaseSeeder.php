@@ -27,7 +27,7 @@ class DatabaseSeeder extends Seeder
         Config::firstOrCreate(['key' => 'always_use_primary_key'], ['key' => 'always_use_primary_key', 'field_type' => 'textarea', 'value' => null]);
 
         // Added around v0.4
-        Config::firstOrCreate(['key' => 'select_count'], ['key' => 'select_count', 'field_type' => 'text', 'value' => 50000]);
+        Config::firstOrCreate(['key' => 'select_count'], ['key' => 'select_count', 'field_type' => 'text', 'value' => 55000]);
         Config::firstOrCreate(['key' => 'update_count'], ['key' => 'update_count', 'field_type' => 'text', 'value' => 2500]);
 
         // Added around 0.5

@@ -113,14 +113,16 @@ class Backup
             return;
         }
 
-        if (($this->state->last_id || $this->state->last_updated_id) && ! $this->table->always_resync) {
+        // A position to carry on from means an incremental run. Tables with no single column primary
+        // key never get one, so they fall through to a full resync - which is what they need, as an
+        // upsert with no key to match on would only append another copy of the table.
+        if ($this->state->last_id && ! $this->table->always_resync) {
             $this->update();
 
             return;
         }
 
         $this->resync();
-
     }
 
     public function has_timestamps(): bool

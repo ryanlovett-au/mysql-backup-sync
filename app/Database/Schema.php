@@ -180,16 +180,11 @@ class Schema
             // Create locally
             DB::connection($this->local_db)->statement($create->{'Create Table'});
 
-            // Add to tables table, if not already present
-            if (! Table::where('database_id', $this->database_id)->where('table_name', $table)->first()) {
-                $create = new Table;
-                $create->database_id = $this->database_id;
-                $create->table_name = $table;
-                $create->save();
-            }
-
             $progress->advance();
         }
+
+        // Add to tables table, if not already present, with the global config applied
+        $this->create_tables_in_tables_db($this->create_local);
 
         $progress->finish();
         echo "\n";
@@ -215,8 +210,12 @@ class Schema
             // Remove state
             State::where('host_id', $this->host_id)->where('database_id', $this->database_id)->where('table_name', $table)->delete();
 
-            // Remove from tables table
-            Table::where('database_id', $this->database_id)->where('table_name', $table)->delete();
+            // Remove from tables table, unless it is going straight back. A structure change drops and
+            // rebuilds the table, and the settings chosen for it should survive that - only the state
+            // needs to go, so the rebuilt table resyncs from scratch.
+            if (! in_array($table, $this->create_local)) {
+                Table::where('database_id', $this->database_id)->where('table_name', $table)->delete();
+            }
 
             $progress->advance();
         }

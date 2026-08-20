@@ -602,8 +602,17 @@ class Backup
 
     public function resync(): void
     {
-        // Truncate
-        DB::connection($this->local_db)->table($this->table->table_name)->delete();
+        // Truncate. It drops and recreates rather than working through the table a row at a time,
+        // which is the difference between an instant clear and a very long one. The server refuses
+        // it on a table another table's foreign key points at, and it wants DROP rather than DELETE
+        // privilege, so fall back to the slow way where it will not run at all.
+        try {
+            DB::connection($this->local_db)->table($this->table->table_name)->truncate();
+        } catch (\Throwable $e) {
+            warning('Could not truncate '.$this->table->table_name.' ('.Error::describe($e).'), clearing it a row at a time instead.');
+
+            DB::connection($this->local_db)->table($this->table->table_name)->delete();
+        }
 
         // Sync
         $this->update();

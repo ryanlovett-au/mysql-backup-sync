@@ -255,14 +255,21 @@ class Menu_Remote
                 spin(message: 'Opening SSH tunnel', callback: fn () => $connect->connect_tunnel($host));
             }
 
-            $connect->setup_remote_db($host, $database, false);
+            try {
+                $connect->setup_remote_db($host, $database);
 
-            spin(message: 'Populating menu with table information...', callback: function () use ($database, $connect) {
-                $schema = new Schema($database, $connect->remote_db);
-                $tables = $schema->get_tables($connect->remote_db);
-                $schema->create_tables_in_tables_db($tables);
-                echo "\n";
-            });
+                spin(message: 'Populating menu with table information...', callback: function () use ($database, $connect) {
+                    $schema = new Schema($database, $connect->remote_db);
+                    $tables = $schema->get_tables($connect->remote_db);
+                    $schema->create_tables_in_tables_db($tables);
+                    echo "\n";
+                });
+            } finally {
+                // Leave nothing behind, the tunnel would otherwise outlive the whole menu session
+                if ($host->use_ssh_tunnel) {
+                    spin(message: 'Closing SSH tunnel', callback: fn () => $connect->disconnect_tunnel());
+                }
+            }
         }
 
         pause();

@@ -47,13 +47,21 @@ class Backup
 
     protected bool $status_loaded = false;
 
-    // Say nothing about time remaining for the first twenty seconds, then wait for a few batches so
-    // the rate has settled - but never stay quiet past ETA_BY, however slow the batches are
+    // Say nothing about time remaining for the first twenty seconds, then wait for a few passes so
+    // the rate has settled - but never stay quiet past ETA_BY, however slow a pass is
     public const ETA_AFTER = 20;
 
-    public const ETA_BATCHES = 3;
+    public const ETA_SAMPLES = 3;
 
     public const ETA_BY = 30;
+
+    // How many passes the rate is averaged over. Enough to ride out a slow one, few enough that a
+    // real change in throughput shows up while it is still worth knowing about.
+    public const ETA_WINDOW = 5;
+
+    protected array $samples = [];
+
+    protected ?float $marked = null;
 
     // Tables tracking by updated_at with no index to support it, collected across the whole run
     public static array $missing_timestamp_indexes = [];
@@ -260,11 +268,29 @@ class Backup
     }
 
     /**
-     * How much longer this table looks like taking, based on the rate so far. Holds off until there
-     * is enough to go on - the very first batch carries the connection and query setup with it, so
-     * a rate taken from that alone reads far worse than the table actually runs.
+     * Record how long a pass took and how much it moved, keeping only the most recent few. A rate
+     * over the whole run stops meaning anything after a few hours - it cannot show a slowdown, or a
+     * recovery, until they have outweighed everything that came before them.
      */
-    protected function eta(float $started, int $done, int $total, int $batches): ?string
+    protected function sample(int $rows, float $started): void
+    {
+        $now = microtime(true);
+
+        $this->samples[] = [$rows, $now - ($this->marked ?? $started)];
+
+        $this->marked = $now;
+
+        if (count($this->samples) > self::ETA_WINDOW) {
+            array_shift($this->samples);
+        }
+    }
+
+    /**
+     * How much longer this table looks like taking, at the rate of the last few passes. Holds off
+     * until there is enough to go on - the first pass carries the connection and query setup with
+     * it, so a rate taken from that alone reads far worse than the table actually runs.
+     */
+    protected function eta(float $started, int $done, int $total): ?string
     {
         $elapsed = microtime(true) - $started;
 
@@ -272,11 +298,22 @@ class Backup
             return null;
         }
 
-        if ($elapsed < self::ETA_AFTER || ($batches < self::ETA_BATCHES && $elapsed < self::ETA_BY)) {
+        if ($elapsed < self::ETA_AFTER) {
             return null;
         }
 
-        return 'About '.self::duration((int) round(($total - $done) * ($elapsed / $done))).' remaining';
+        if (count($this->samples) < self::ETA_SAMPLES && $elapsed < self::ETA_BY) {
+            return null;
+        }
+
+        $rows = array_sum(array_column($this->samples, 0));
+        $seconds = array_sum(array_column($this->samples, 1));
+
+        if ($rows < 1 || $seconds <= 0) {
+            return null;
+        }
+
+        return 'About '.self::duration((int) round(($total - $done) * ($seconds / $rows))).' remaining';
     }
 
     protected static function duration(int $seconds): string
@@ -442,6 +479,10 @@ class Backup
 
             $started = microtime(true);
 
+            // Rate samples run from here, so the first one covers the first select as well
+            $this->samples = [];
+            $this->marked = $started;
+
             $select_count = $this->select_size();
 
             // The destination structure cannot change mid-run, so only look the columns up once
@@ -450,11 +491,10 @@ class Backup
 
             $write_size = $this->write_size($columns);
 
-            $batches = 0;
-
-            $write = function ($rows) use ($progress, $primary_key, $timestamps, $columns, $started, $count, &$batches, &$write_size) {
+            $write = function ($rows) use ($progress, $primary_key, $timestamps, $columns, $started, $count, &$write_size) {
 
                 $queue = $rows->all();
+                $written = 0;
 
                 while (count($queue) > 0) {
                     // Cast rows to arrays
@@ -491,19 +531,28 @@ class Backup
                     $this->state->last_id = $last[$primary_key] ?? null;
                     $this->state->save();
 
-                    $batches++;
-
-                    // Set before advancing, that is what draws it
-                    if ($eta = $this->eta($started, $progress->progress + count($fewerows), $count, $batches)) {
-                        $progress->hint($eta);
-                    }
+                    $written += count($fewerows);
 
                     $progress->advance(count($fewerows));
 
                     // Stop on a whole batch, with the state for it already written
                     if (Interrupt::requested()) {
-                        return false;
+                        break;
                     }
+                }
+
+                // One sample per pass, so it spans a select and the writes that emptied it. Sampling
+                // the writes alone would read fast, then jump every time a select added time with no
+                // rows against it - the rate is only honest over a whole cycle.
+                $this->sample($written, $started);
+
+                if ($eta = $this->eta($started, $progress->progress, $count)) {
+                    $progress->hint($eta);
+                    $progress->render();
+                }
+
+                if (Interrupt::requested()) {
+                    return false;
                 }
             };
 

@@ -197,31 +197,35 @@ class Connect
         try {
             DB::connection($this->local_db)->getPDO();
         } catch (\Throwable $e) {
-            // Database not created
-            if (Error::code($e) == 1049) {
-                // Create missing database
-                if ($create) {
-                    // Null out databse
-                    $connect['database'] = null;
-                    AppConfig::set('database.connections.'.$this->local_db, $connect);
-
-                    // Reconnect and create database
-                    DB::reconnect($this->local_db)->statement('CREATE DATABASE IF NOT EXISTS '.$db_name.';');
-
-                    // Reapply database name
-                    $connect['database'] = $db_name;
-                    AppConfig::set('database.connections.'.$this->local_db, $connect);
-
-                    // Disconnect to force reconnection next time
-                    DB::disconnect($this->local_db);
-                } else {
-                    alert('Error: Destination database does not exist and not able to be created.');
-
-                    $this->disconnect_tunnel();
-
-                    exit(1);
-                }
+            // A missing database is the one failure we can put right ourselves. Anything else - bad
+            // credentials, host unreachable, no privileges - has to go up, or we would carry on and
+            // fail later with something far less obvious than the real problem
+            if (Error::code($e) != 1049) {
+                throw $e;
             }
+
+            // Database not created
+            if (! $create) {
+                alert('Error: Destination database does not exist and not able to be created.');
+
+                $this->disconnect_tunnel();
+
+                exit(1);
+            }
+
+            // Null out databse
+            $connect['database'] = null;
+            AppConfig::set('database.connections.'.$this->local_db, $connect);
+
+            // Reconnect and create database
+            DB::reconnect($this->local_db)->statement('CREATE DATABASE IF NOT EXISTS '.$db_name.';');
+
+            // Reapply database name
+            $connect['database'] = $db_name;
+            AppConfig::set('database.connections.'.$this->local_db, $connect);
+
+            // Disconnect to force reconnection next time
+            DB::disconnect($this->local_db);
         }
 
         $progress->finish();

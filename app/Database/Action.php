@@ -133,7 +133,10 @@ class Action
 
             // Disconnect any SSH tunnels for this host
             info('End host: '.($host->ssh_host ? $host->ssh_host : $host->db_host));
-            spin(message: 'Closing SSH tunnel', callback: fn () => $connect->disconnect_tunnel());
+
+            if ($host->use_ssh_tunnel) {
+                spin(message: 'Closing SSH tunnel', callback: fn () => $connect->disconnect_tunnel());
+            }
         }
 
         // Report any tables that are tracking by updated_at without an index to support it

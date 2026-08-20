@@ -89,10 +89,16 @@ class Connect
 
     public function disconnect_tunnel(): void
     {
+        // There is nothing to close for a host that connects directly
+        if (is_null($this->tunnel)) {
+            return;
+        }
+
         if (is_numeric($this->tunnel->getPid())) {
             exec('kill '.escapeshellarg($this->tunnel->getPid()), $output, $code);
-            $this->tunnel = null;
         }
+
+        $this->tunnel = null;
 
         note('');
     }

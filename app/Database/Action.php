@@ -72,8 +72,9 @@ class Action
                     $connect->setup_remote_db($host, $database);
                     $connect->setup_local_db($host, $database);
 
-                    // Check source and destination server timezones match
-                    if (! in_array('skip-tz-check', $options) && (! is_null(Config::get('skip_tz_check')) && Config::get('skip_tz_check') == '0')) {
+                    // Check source and destination server timezones match. The command line option is
+                    // a key rather than a value, and any config value that is not empty or 0 means skip.
+                    if (empty($options['skip-tz-check']) && ! Config::get('skip_tz_check')) {
                         $connect->check_tz();
                     }
 

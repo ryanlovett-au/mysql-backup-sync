@@ -234,33 +234,33 @@ class Connect
 
     public function check_tz()
     {
-        $remote = DB::connection($this->remote_db)->selectOne('SELECT @@global.time_zone')->{'@@global.time_zone'};
-
-        if ($remote == 'SYSTEM') {
-            $remote = DB::connection($this->remote_db)->selectOne('SELECT @@system_time_zone')->{'@@system_time_zone'};
-        }
-
-        if ($remote == '+00:00') {
-            $remote = 'UTC';
-        }
-
-        $local = DB::connection($this->local_db)->selectOne('SELECT @@global.time_zone')->{'@@global.time_zone'};
-
-        if ($local == 'SYSTEM') {
-            $local = DB::connection($this->local_db)->selectOne('SELECT @@system_time_zone')->{'@@system_time_zone'};
-        }
-
-        if ($local == '+00:00') {
-            $local = 'UTC';
-        }
+        $remote = $this->timezone($this->remote_db);
+        $local = $this->timezone($this->local_db);
 
         if ($remote != $local) {
-            alert('Error: Destination database timezone ('.$local.') does not match source database timezone ('.$remote.'). This will likely cause issues with datetime object synchronisation during DST transitions. Please correct this issue.');
-
-            $this->disconnect_tunnel();
-
-            exit(1);
+            // Thrown rather than exited, so this is reported and notified like any other failure and
+            // leaves the rest of the run, and the menu, still standing
+            throw new \RuntimeException(
+                'Destination database timezone ('.$local.') does not match source database timezone ('.$remote.'). '.
+                'This will likely cause issues with datetime object synchronisation during DST transitions. '.
+                'Correct this, or set SKIP TZ CHECK to 1 to proceed anyway.'
+            );
         }
+    }
+
+    /**
+     * What timezone a server is actually keeping time in. A server set to SYSTEM defers to the host
+     * clock, and +00:00 and UTC are the same thing written two ways.
+     */
+    protected function timezone($connection): string
+    {
+        $zone = DB::connection($connection)->selectOne('SELECT @@global.time_zone')->{'@@global.time_zone'};
+
+        if ($zone == 'SYSTEM') {
+            $zone = DB::connection($connection)->selectOne('SELECT @@system_time_zone')->{'@@system_time_zone'};
+        }
+
+        return $zone == '+00:00' ? 'UTC' : $zone;
     }
 
     public function test($host): void

@@ -139,6 +139,8 @@ Once you have provided a database name, this application will then attempt to co
 
 You can then choose, for each table, if you would like the application to skip that table during backup/sync, or what behaviour you would like the application to use when backing up/syncing.
 
+**Note:** The `ALWAYS ...` lists in the destination config are applied to matching tables when you save them, and to any table found on a later run. They are not a live list, so taking a table back out of one will not undo the setting - change it on the table itself.
+
 ## Running a Backup/Sync
 
 You can then run a backup/sync from the main menu

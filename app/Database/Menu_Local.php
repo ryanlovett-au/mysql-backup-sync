@@ -73,10 +73,10 @@ class Menu_Local
             $update = textarea(
                 label: strtoupper(str_replace('_', ' ', $config->key)).' = ',
                 default: $config->value ?? '',
-                hint: 'A list of table names separated by newlines...'
+                hint: 'A list of table names separated by newlines. Applied when you save, and to tables found later...'
             );
 
-            $confirmed = confirm('All matching tables in the source databases config will now be updated with this setting. Are you sure?');
+            $confirmed = confirm('All matching tables in the source databases config will now be updated with this setting. Taking a table back out will not undo it. Are you sure?');
 
             if ($confirmed) {
                 $config->value = $update;

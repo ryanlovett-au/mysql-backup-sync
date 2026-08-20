@@ -437,6 +437,9 @@ class Backup
             $progress = progress(label: ($this->table->always_resync ? 'Resyncing' : 'Updating').' '.$this->table->table_name.($estimated ? ' ~' : ''), steps: $count);
             $progress->start();
 
+            // The progress bar just took ctrl-c off us, take it back
+            Interrupt::listen();
+
             $started = microtime(true);
 
             $select_count = $this->select_size();
@@ -496,6 +499,11 @@ class Backup
                     }
 
                     $progress->advance(count($fewerows));
+
+                    // Stop on a whole batch, with the state for it already written
+                    if (Interrupt::requested()) {
+                        return false;
+                    }
                 }
             };
 
@@ -528,6 +536,10 @@ class Backup
             $cursor = [$this->state->last_updated_at, $this->state->last_id];
 
             $callback($rows);
+
+            if (Interrupt::requested()) {
+                break;
+            }
 
             // The cursor has to move, otherwise we would ask the source for the same rows forever
             if ($cursor === [$this->state->last_updated_at, $this->state->last_id]) {

@@ -12,6 +12,7 @@ use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\pause;
 use function Laravel\Prompts\spin;
+use function Laravel\Prompts\warning;
 
 class Action
 {
@@ -30,6 +31,9 @@ class Action
             note('');
             info('Memory limit raised to '.$raised);
         }
+
+        // Let ctrl-c stop the run between batches instead of killing the process mid-write
+        Interrupt::listen();
 
         // Process each host in turn
         foreach ($hosts as $host) {
@@ -120,6 +124,10 @@ class Action
 
                             break;
                         }
+
+                        if (Interrupt::requested()) {
+                            break;
+                        }
                     }
                 } catch (\Throwable $e) {
                     alert('Error: '.Error::describe($e));
@@ -133,6 +141,11 @@ class Action
                     break;
                 }
 
+                // A run we stopped ourselves is not a success, and not a failure either
+                if (Interrupt::requested()) {
+                    break;
+                }
+
                 // Notify success
                 self::notify($database);
             }
@@ -143,12 +156,26 @@ class Action
             if ($host->use_ssh_tunnel) {
                 spin(message: 'Closing SSH tunnel', callback: fn () => $connect->disconnect_tunnel());
             }
+
+            if (Interrupt::requested()) {
+                break;
+            }
+        }
+
+        $stopped = Interrupt::requested();
+
+        // Hand ctrl-c back before we return to the menu
+        Interrupt::release();
+
+        if ($stopped) {
+            note('');
+            warning('Stopped. Every completed batch has been saved, the next run carries on from there.');
         }
 
         // Report any tables that are tracking by updated_at without an index to support it
         Backup::report_missing_indexes();
 
-        if (! $cli && count(Backup::$missing_timestamp_indexes) > 0) {
+        if (! $cli && ($stopped || count(Backup::$missing_timestamp_indexes) > 0)) {
             pause();
         }
     }

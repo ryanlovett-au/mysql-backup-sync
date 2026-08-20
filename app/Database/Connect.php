@@ -56,10 +56,34 @@ class Connect
         $this->tunnel->start();
 
         // Check
+        $connected = false;
         $i = 10;
-        while (! $this->check_tunnel() && $i > 0) {
+
+        while ($i > 0) {
+            if ($connected = $this->check_tunnel()) {
+                break;
+            }
+
+            // Nothing left to wait for if ssh has already given up
+            if (! $this->tunnel->isRunning()) {
+                break;
+            }
+
             sleep(1);
             $i--;
+        }
+
+        // Carrying on without a tunnel only produces a confusing error from the database a moment
+        // later, so stop here and say what ssh said - which is usually the actual problem
+        if (! $connected) {
+            $reason = trim($this->tunnel->getErrorOutput());
+
+            $this->disconnect_tunnel();
+
+            throw new \RuntimeException(
+                'Could not open an SSH tunnel to '.$host->ssh_host.'. '.
+                ($reason !== '' ? $reason : 'ssh gave no reason and the port never opened.')
+            );
         }
 
         note('');
@@ -271,8 +295,17 @@ class Connect
 
     public function test($host): void
     {
+        // The tunnel has to come up first, it is what decides the local port below
         if ($host->use_ssh_tunnel) {
-            spin(message: 'Opening SSH tunnel', callback: fn () => $this->connect_tunnel($host));
+            try {
+                spin(message: 'Opening SSH tunnel', callback: fn () => $this->connect_tunnel($host));
+            } catch (\Throwable $e) {
+                error('Connection FAILED: '.Error::describe($e));
+
+                pause();
+
+                return;
+            }
         }
 
         $connect = [

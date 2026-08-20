@@ -251,11 +251,11 @@ class Menu_Remote
 
             $connect = new Connect;
 
-            if ($host->use_ssh_tunnel) {
-                spin(message: 'Opening SSH tunnel', callback: fn () => $connect->connect_tunnel($host));
-            }
-
             try {
+                if ($host->use_ssh_tunnel) {
+                    spin(message: 'Opening SSH tunnel', callback: fn () => $connect->connect_tunnel($host));
+                }
+
                 $connect->setup_remote_db($host, $database);
 
                 spin(message: 'Populating menu with table information...', callback: function () use ($database, $connect) {
@@ -264,6 +264,8 @@ class Menu_Remote
                     $schema->create_tables_in_tables_db($tables);
                     echo "\n";
                 });
+            } catch (\Throwable $e) {
+                alert('Could not read the table list: '.Error::describe($e));
             } finally {
                 // Leave nothing behind, the tunnel would otherwise outlive the whole menu session
                 if ($host->use_ssh_tunnel) {

@@ -55,7 +55,22 @@ class Action
             $connect = new Connect;
 
             if ($host->use_ssh_tunnel) {
-                spin(message: 'Opening SSH tunnel', callback: fn () => $connect->connect_tunnel($host));
+                try {
+                    spin(message: 'Opening SSH tunnel', callback: fn () => $connect->connect_tunnel($host));
+                } catch (\Throwable $e) {
+                    alert('Error: '.Error::describe($e));
+
+                    // None of this host's databases can be reached, so tell each of them so
+                    foreach ($host->databases as $database) {
+                        self::notify($database, false);
+                    }
+
+                    if (! $cli) {
+                        pause();
+                    }
+
+                    continue;
+                }
             }
 
             // Fot this host, process each database in turn

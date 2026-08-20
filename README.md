@@ -38,17 +38,25 @@ The first step is to configure a destination (local/backup) database, this can b
 ```
  ┌ Configure Destination (Backup) Host/Database ────────────────┐
  │   ○ -------------------- Config ----------------------       │
- │   ○ BACKUP DB HOST     = 127.0.0.1                           │
- │   ○ BACKUP DB PORT     = 3306                                │
- │   ○ BACKUP DB USERNAME = root                                │
- │   ○ BACKUP DB PASSWORD =                                     │
- │   ○ SKIP TZ CHECK      = 1                                   │
+ │   ○ BACKUP DB HOST         = 127.0.0.1                       │
+ │   ○ BACKUP DB PORT         = 3306                            │
+ │   ○ BACKUP DB USERNAME     = root                            │
+ │   ○ BACKUP DB PASSWORD     =                                 │
+ │   ○ SKIP TZ CHECK          = 1                               │
+ │   ○ ALWAYS RESYNC TABLES   =                                 │
+ │   ○ ALWAYS INACTIVE TABLES =                                 │
+ │   ○ ALWAYS USE PRIMARY KEY =                                 │
+ │   ○ SELECT COUNT           = 55000                           │
+ │   ○ UPDATE COUNT           = 2500                            │
+ │   ○ KEEP DB NAMES          =                                 │
  │   ○ --------------------------------------------------       │
  │ › ● Back                                                     │
  └──────────────────────────────────────────────────────────────┘
 ```
 
 **Note:** The MySQL server you are using for backups really *must* have a matching timezone to the remote source servers. You can override this check here, however it is likely you will get timestamp/datetime errors during sync. You have been warned!
+
+`SELECT COUNT` and `UPDATE COUNT` are upper limits rather than fixed sizes. Rows selected are capped to what will fit in memory, and rows written are capped by the column count of each table, so you can leave them high and let the application work out the rest.
 
 ### Configure Source (Original) Hosts
 
@@ -147,6 +155,29 @@ Or by running `php artisan db:backup`.
 
 The application will then iterate through every host and database and backup/sync each table based on the configured parameters. The application will display a real-time UI of what is happening.
 
+```
+ Memory limit raised to 2G
+
+ Start host: 172.30.176.22
+
+ ⠠ Opening SSH tunnel
+
+ Database: responder_one
+
+ ┌ Comparing table structures ──────────────────────────────────┐
+ │ ████████████████████████████████████████████████████████████ │
+ └─────────────────────────────────────────────────────── 79/79 ┘
+
+ ┌ Updating audit_log ~ ────────────────────────────────────────┐
+ │ █                                                            │
+ └─────────────────────────────────────────── 2090000/399013679 ┘
+  About 16h 24m remaining
+```
+
+A row count marked with a `~` is the source server's own estimate rather than a count, used where counting the table would take longer than you would care to wait for. The time remaining is worked out from the last few batches, so it follows what the link is doing now rather than averaging the whole run.
+
+Press `ctrl-c` to stop a run. It will finish the batch it is on, save its place and hand you back to the menu. Press it again if you would rather not wait.
+
 *You may also use the `php artisan db:backup --host= --database=` arguments to target a specific host and/or database from the command line.* 
 
 During this process the application will first compare the schemas of the source and destination backups and determine if tables have been added or removed from the source and will action those changes on the destination copy as required.
@@ -161,7 +192,9 @@ The application will then proceed to copy rows between databases.
 
 ## How Statefulness/Incremental Backups Work
 
-For each initial backup sync, this application will copy rows based on each table's primary key, in ascending order. Each 500 rows, the application will store the current primary key and if the sync is interrupted it will continue from the last known good primary key.
+For each initial backup sync, this application will copy rows based on each table's primary key, in ascending order. After each batch of rows written, the application will store the current primary key and if the sync is interrupted it will continue from the last known good primary key.
+
+Every batch seeks straight to the stored position rather than paging past everything ahead of it, so the last batch of a large table costs the source no more than the first.
 
 If the table has an `updated_at` column the application will also store the timestamp when it commences its first sync attempt.
 
@@ -172,7 +205,9 @@ For tables with an `updated_at` column, on subsequent runs, the application will
 
 For tables without an `updated_at` column, and where `always_resync` is set to false, the application will simply copy any rows with a primary key > the last run.
 
-For tables where `always_resync` is set to true, the application will truncate and do a full resync on each run.
+For tables where `always_resync` is set to true, the application will clear the destination table and do a full resync on each run.
+
+**Note:** Seeking from a stored position needs a primary key of a single column. A table with a composite primary key and no `updated_at` cannot be tracked, so it is resynced in full and the application will tell you it is doing so.
 
 ## Restoring a Backup
 
@@ -187,8 +222,10 @@ As this application is primarily designed to support Laravel applications, the r
 ## Troubleshooting
 
 You may encounter errors during your use of this application, they are detailed here:
- - Error 1390: You are trying to insert/update too many rows (or too many rows with too many columns), reduce the chunk value on updates in the local config. 500 has proven to be a good balance of performance and stability.
- - Error 2006: The database server has run out of memory or otherwise gone away. This is generally due to a select size (number of rows) that are sorting unindexed columns in memory. Confirm indexes exist and/or reduce the nubmer of rows being selected in each chuck and/or do whole table resyncs (which do not sort) if the table is small enough.
+ - Error 1390: Too many placeholders in one statement. The application works the row limit out from each table's column count, so you should not see this. If a server refuses a write on size anyway, the write is halved and the smaller size is kept for that table.
+ - Error 2006: The database server has run out of memory or otherwise gone away. Almost always an `updated_at` column with no index, which leaves the source sorting the whole table for every batch. The application lists these tables at the end of a run, along with the `ALTER TABLE` you need.
+
+Errors are reported in plain english where the application recognises them, and a failed table will notify your webhook and move on rather than taking the run down with it.
 
 ## Contributing
 

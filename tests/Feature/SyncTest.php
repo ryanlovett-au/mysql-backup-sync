@@ -2,7 +2,11 @@
 
 namespace Tests\Feature;
 
+use App\Database\Backup;
 use App\Database\Interrupt;
+use Laravel\Prompts\Prompt;
+use Symfony\Component\Console\Output\BufferedOutput;
+use Symfony\Component\Console\Output\NullOutput;
 use Tests\Support\BuildsBackups;
 use Tests\Support\StubConnection;
 use Tests\TestCase;
@@ -93,6 +97,75 @@ class SyncTest extends TestCase
         $this->assertTrue(Interrupt::requested());
         $this->assertSame(100, StubConnection::rows_written(), 'it stops on a whole batch');
         $this->assertSame(100, (int) $backup->state->fresh()->last_id, 'the cursor matches what was written');
+    }
+
+    /**
+     * Run something with the prompt output captured, and hand back what it drew. Prompts writes to
+     * its own stream rather than to stdout, so this swaps that stream rather than buffering output.
+     */
+    protected function outputOf(callable $work): string
+    {
+        $buffer = new BufferedOutput;
+
+        Prompt::setOutput($buffer);
+
+        try {
+            $work();
+        } finally {
+            Prompt::setOutput(new NullOutput);
+        }
+
+        return $buffer->fetch();
+    }
+
+    public function test_a_table_with_nothing_to_do_still_reports_itself(): void
+    {
+        $this->sourceRows('orders', 10);
+
+        // a watermark later than every row, so there is no work to be found
+        $backup = $this->makeBackup('orders', [], ['last_updated_at' => '2030-01-01 00:00:00', 'last_id' => 10]);
+
+        $shown = $this->outputOf(fn () => $backup->update());
+
+        $this->assertSame(0, StubConnection::rows_written());
+        $this->assertStringContainsString('orders', $shown, 'the table should still appear in the run');
+        $this->assertStringContainsString('nothing to update', $shown);
+    }
+
+    public function test_a_missing_index_is_collected_but_not_said_between_every_bar(): void
+    {
+        Backup::$missing_timestamp_indexes = [];
+
+        $this->sourceRows('orders', 40);
+
+        $backup = $this->makeBackup('orders', [], ['last_updated_at' => '2020-01-01 00:00:00', 'last_id' => 1]);
+
+        $shown = $this->outputOf(fn () => $backup->update());
+
+        $this->assertContains('testdb.orders', Backup::$missing_timestamp_indexes, 'still collected');
+        $this->assertStringNotContainsString('No index on updated_at', $shown, 'but not said inline');
+    }
+
+    public function test_a_table_set_to_always_resync_is_not_nagged_about_an_index(): void
+    {
+        Backup::$missing_timestamp_indexes = [];
+
+        $this->sourceRows('orders', 40);
+
+        $this->makeBackup('orders', ['always_resync' => 1])->update();
+
+        $this->assertSame([], Backup::$missing_timestamp_indexes, 'it does not track by updated_at');
+    }
+
+    public function test_a_table_set_to_use_its_primary_key_is_not_nagged_about_an_index(): void
+    {
+        Backup::$missing_timestamp_indexes = [];
+
+        $this->sourceRows('orders', 40);
+
+        $this->makeBackup('orders', ['always_primary_key' => 1], ['last_id' => 0])->update();
+
+        $this->assertSame([], Backup::$missing_timestamp_indexes, 'it does not track by updated_at');
     }
 
     public function test_a_resync_truncates(): void

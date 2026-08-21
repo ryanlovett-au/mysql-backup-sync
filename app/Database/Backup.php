@@ -146,11 +146,11 @@ class Backup
 
         $table = $this->database_name.'.'.$this->table->table_name;
 
+        // Collected for the end of the run rather than said here. On a database of any size this
+        // fires for table after table, and a warning between every progress bar is not read.
         if (! in_array($table, self::$missing_timestamp_indexes)) {
             self::$missing_timestamp_indexes[] = $table;
         }
-
-        warning('No index on updated_at for '.$this->table->table_name.', every batch must scan and sort the whole table.');
     }
 
     /**
@@ -471,14 +471,23 @@ class Backup
             callback: $counter
         );
 
+        // Every table gets a bar, including one with nothing to do, so a run visibly walks the whole
+        // list rather than going quiet on the tables it had no work for. Prompts will not build a bar
+        // of no steps, so an empty one is a single step already taken, and says so.
+        $progress = progress(
+            label: ($this->table->always_resync ? 'Resyncing' : 'Updating').' '.$this->table->table_name
+                .($estimated ? ' ~' : '')
+                .($count > 0 ? '' : ' (nothing to update)'),
+            steps: max(1, $count)
+        );
+
+        $progress->start();
+
+        // The progress bar just took ctrl-c off us, take it back
+        Interrupt::listen();
+
         // Are we going??
         if ($count > 0) {
-            $progress = progress(label: ($this->table->always_resync ? 'Resyncing' : 'Updating').' '.$this->table->table_name.($estimated ? ' ~' : ''), steps: $count);
-            $progress->start();
-
-            // The progress bar just took ctrl-c off us, take it back
-            Interrupt::listen();
-
             $started = microtime(true);
 
             // Rate samples run from here, so the first one covers the first select as well
@@ -565,10 +574,12 @@ class Backup
             } else {
                 $this->chunk_by_cursor($query, $select_count, $write);
             }
-
-            $progress->finish();
-            echo "\n";
+        } else {
+            $progress->advance();
         }
+
+        $progress->finish();
+        echo "\n";
     }
 
     /**
